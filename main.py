@@ -1,312 +1,208 @@
-# ============================================================
-# Suzuki Parts – Centrale Desktop App
-# main.py
-# ============================================================
-from utils.theme import DARK_THEME, LIGHT_THEME
-from PySide6.QtGui import QGuiApplication
-
 import sys
-import pandas as pd
-from PySide6.QtGui import QIcon
 import ctypes
+
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget,
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFileDialog, QMessageBox, QFrame, QSizePolicy
+    QWidget, QVBoxLayout, QPushButton,
+    QLabel, QFileDialog, QMessageBox, QSplashScreen
 )
-from PySide6.QtCore import Qt, QLockFile
+from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import QLockFile, Qt
+
+import pandas as pd
 
 from app_state import AppState
-from utils.paths import resource_path, output_root, appdata_root, get_lock_file
-
-# Tabs
 from tabs.tab_inboeken import TabInboeken
-from tabs.tab_website_277 import TabWebsite277
+from tabs.tab_tradelist import TabTradelist
 from tabs.tab_tlc_1322 import TabTLC1322
 from tabs.tab_tlc_update import TabTLCUpdate
-from tabs.tab_tradelist import TabTradelist
+from tabs.tab_website_277 import TabWebsite277
 from tabs.tab_factuurmaker import TabFactuurmaker
 from tabs.tab_zoeklijst import TabZoeklijst
 
-# ============================================================
-# INTRO TAB – WC EXPORT UPLOAD
-# ============================================================
-def system_is_dark():
-    palette = QGuiApplication.palette()
-    return palette.window().color().lightness() < 128
+from services.update_checker import check_github_release
+from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO
+from utils.paths import resource_path, output_root, appdata_root, get_lock_file
+from services.auto_updater import run_updater
+
 
 def create_single_instance_lock():
     lock = QLockFile(str(get_lock_file()))
     lock.setStaleLockTime(0)
+
     if not lock.tryLock():
         QMessageBox.warning(None, "App al geopend", "Suzuki Parts Manager is al geopend.")
         return None
+
     return lock
 
-class TabIntro(QWidget):
-    def __init__(self, app_state: AppState, on_loaded_callback):
+
+def create_splash(app: QApplication) -> QSplashScreen:
+    splash_path = resource_path("assets/splash.png")
+
+    pixmap = QPixmap(str(splash_path))
+    if pixmap.isNull():
+        # fallback als splash.png nog niet bestaat
+        pixmap = QPixmap(700, 380)
+        pixmap.fill(Qt.white)
+
+    splash = QSplashScreen(pixmap)
+    splash.setWindowFlag(Qt.WindowStaysOnTopHint)
+    splash.show()
+    app.processEvents()
+    return splash
+
+
+def splash_message(app: QApplication, splash: QSplashScreen, text: str):
+    splash.showMessage(
+        text,
+        Qt.AlignBottom | Qt.AlignHCenter,
+        Qt.black
+    )
+    app.processEvents()
+
+
+def maybe_check_for_updates(parent=None):
+    info = check_github_release(
+        current_version=APP_VERSION,
+        github_owner=GITHUB_OWNER,
+        github_repo=GITHUB_REPO,
+        timeout_seconds=3,
+    )
+
+    if info.error:
+        return
+
+    if not info.update_available:
+        return
+
+    msg = QMessageBox(parent)
+    msg.setIcon(QMessageBox.Information)
+    msg.setWindowTitle("Update beschikbaar")
+    msg.setText(
+        f"Er is een nieuwe versie beschikbaar.\n\n"
+        f"Huidige versie: {info.current_version}\n"
+        f"Nieuwe versie: {info.latest_version}"
+    )
+
+    if info.asset_name:
+        msg.setInformativeText(f"Downloadbestand: {info.asset_name}")
+    else:
+        msg.setInformativeText("Er is een nieuwe release beschikbaar.")
+
+    btn_download = msg.addButton("Download", QMessageBox.AcceptRole)
+    msg.addButton("Later", QMessageBox.RejectRole)
+
+    msg.exec()
+
+    if msg.clickedButton() == btn_download:
+        target = info.download_url or info.release_url
+        if target:
+
+            run_updater(target)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
         super().__init__()
-        if system_is_dark():
-            self.setStyleSheet(DARK_THEME)
-        else:
-            self.setStyleSheet(LIGHT_THEME)
-        self.app_state = app_state
-        self.on_loaded_callback = on_loaded_callback
-        self._build_ui()
 
-    def _build_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
-        root.setSpacing(14)
+        self.app_state = AppState()
 
-        # Header
-        title = QLabel("Suzuki Parts Manager")
-        title.setObjectName("IntroTitle")
-        title.setAlignment(Qt.AlignLeft)
+        self.setWindowTitle("Suzuki Parts Manager")
+        self.setWindowIcon(QIcon(str(resource_path("assets/app_icon.png"))))
+        self.resize(1100, 750)
 
-        subtitle = QLabel("Laad eerst je WooCommerce product-export (CSV). Daarna worden alle tabs ontgrendeld.")
-        subtitle.setWordWrap(True)
-        subtitle.setObjectName("IntroSubtitle")
-        subtitle.setAlignment(Qt.AlignLeft)
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
 
-        header = QVBoxLayout()
-        header.setSpacing(6)
-        header.addWidget(title)
-        header.addWidget(subtitle)
+        self.intro_tab = self.create_intro_tab()
+        self.tabs.addTab(self.intro_tab, "Start")
 
-        # Cards row
-        cards_row = QHBoxLayout()
-        cards_row.setSpacing(14)
+    def create_intro_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
 
-        def make_card(card_title: str, card_text: str):
-            frame = QFrame()
-            frame.setFrameShape(QFrame.StyledPanel)
-            frame.setObjectName("IntroCard")
-            frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        label = QLabel("Upload WooCommerce export (.xlsx)")
+        btn = QPushButton("Selecteer bestand")
+        btn.clicked.connect(self.load_wc_export)
 
-            v = QVBoxLayout(frame)
-            v.setContentsMargins(14, 12, 14, 12)
-            v.setSpacing(8)
+        self.status_label = QLabel("Nog geen bestand geladen")
 
-            t = QLabel(card_title)
-            t.setObjectName("IntroCardTitle")
-            t.setWordWrap(True)
+        layout.addWidget(label)
+        layout.addWidget(btn)
+        layout.addWidget(self.status_label)
 
-            body = QLabel(card_text)
-            body.setObjectName("IntroCardBody")
-            body.setWordWrap(True)
-
-            v.addWidget(t)
-            v.addWidget(body)
-            v.addStretch(1)
-            return frame
-
-        card1 = make_card(
-            "Stap 1 — Exporteren",
-            "WooCommerce → Producten → Exporteren\n"
-            "• Kies: Alle producten\n"
-            "• Exporteer als CSV\n"
-            "• Download het bestand"
-        )
-        card2 = make_card(
-            "Stap 2 — Uploaden",
-            "Klik hieronder op ‘Upload WooCommerce CSV export’.\n"
-            "De app gebruikt dit bestand als ‘één waarheid’ en schrijft nooit direct naar WooCommerce."
-        )
-        card3 = make_card(
-            "Tip — Snelle check",
-            "Na laden zie je:\n"
-            "• Bestandsnaam en pad\n"
-            "• Aantal producten\n"
-            "• Aantal op voorraad\n"
-            "Zo weet je meteen of je de juiste export hebt."
-        )
-
-        cards_row.addWidget(card1)
-        cards_row.addWidget(card2)
-        cards_row.addWidget(card3)
-
-        # Action area
-        action_frame = QFrame()
-        action_frame.setFrameShape(QFrame.StyledPanel)
-        action_frame.setObjectName("IntroAction")
-
-        action_layout = QHBoxLayout(action_frame)
-        action_layout.setContentsMargins(14, 12, 14, 12)
-        action_layout.setSpacing(12)
-
-        self.btn_upload = QPushButton("Upload WooCommerce CSV export")
-        self.btn_upload.setObjectName("PrimaryButton")
-        self.btn_upload.setFixedHeight(44)
-        self.btn_upload.clicked.connect(self.load_wc_export)
-
-        self.status = QLabel("❌ Nog geen WooCommerce-export geladen")
-        self.status.setWordWrap(True)
-        self.status.setObjectName("IntroStatus")
-
-        self.file_info = QLabel("")
-        self.file_info.setWordWrap(True)
-        self.file_info.setObjectName("IntroFileInfo")
-
-        left = QVBoxLayout()
-        left.setSpacing(6)
-        left.addWidget(self.status)
-        left.addWidget(self.file_info)
-
-        action_layout.addLayout(left, stretch=1)
-        action_layout.addWidget(self.btn_upload)
-
-        # Minimal, theme-friendly styling (works with both LIGHT_THEME & DARK_THEME)
-        self.setStyleSheet(self.styleSheet() + """
-            QLabel#IntroTitle { font-size: 26px; font-weight: 800; }
-            QLabel#IntroSubtitle { font-size: 13px; opacity: 0.9; }
-            QFrame#IntroCard, QFrame#IntroAction { border-radius: 12px; }
-            QLabel#IntroCardTitle { font-size: 14px; font-weight: 700; }
-            QLabel#IntroCardBody { font-size: 12px; }
-            QLabel#IntroStatus { font-size: 13px; font-weight: 600; }
-            QLabel#IntroFileInfo { font-size: 12px; opacity: 0.9; }
-            QPushButton#PrimaryButton { font-size: 13px; font-weight: 700; padding: 10px 14px; }
-        """)
-
-        root.addLayout(header)
-        root.addSpacing(4)
-        root.addLayout(cards_row)
-        root.addSpacing(4)
-        root.addWidget(action_frame)
-        root.addStretch(1)
-
-
+        return widget
 
     def load_wc_export(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Selecteer WooCommerce export",
             "",
-            "CSV bestanden (*.csv)"
+            "Excel bestanden (*.xlsx)"
         )
 
         if not path:
             return
 
         try:
-            df = pd.read_csv(path, dtype=str, low_memory=False)
+            df = pd.read_excel(path)
+            self.app_state.set_wc_export(df, path)
+            self.status_label.setText(f"Geladen: {path}")
+            self.create_work_tabs()
+
         except Exception as e:
-            QMessageBox.critical(self, "Fout", f"Kan CSV niet laden:\n{e}")
-            return
-
-        # Centrale state
-        self.app_state.set_wc_export(df, path)
-
-        # Kleine sanity checks / info
-        n_rows = int(len(df))
-        stock_col = "Voorraad" if "Voorraad" in df.columns else ("Stock" if "Stock" in df.columns else None)
-        in_stock = None
-        if stock_col:
-            try:
-                s = pd.to_numeric(df[stock_col], errors="coerce").fillna(0)
-                in_stock = int((s > 0).sum())
-            except Exception:
-                in_stock = None
-
-        self.status.setText("✅ WooCommerce-export geladen")
-        info_lines = [
-            f"Bestand: {path}",
-            f"Producten: {n_rows:,}".replace(",", ".")
-        ]
-        if in_stock is not None:
-            info_lines.append(f"Op voorraad (>0): {in_stock:,}".replace(",", "."))
-        self.file_info.setText("\n".join(info_lines))
-
-        QMessageBox.information(
-            self,
-            "Succes",
-            "WooCommerce-export succesvol geladen.\n\n"
-            "De applicatie wordt nu ontgrendeld."
-        )
-
-        self.on_loaded_callback()
-
-
-# ============================================================
-# MAIN WINDOW
-# ============================================================
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-
-        self.setWindowIcon(QIcon(str(resource_path("assets/app_icon.png"))))
-        self.setWindowTitle("Suzuki Parts – Afboeken & Inboeken")
-
-        self.app_state = AppState()
-
-        self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
-
-        # Intro tab (altijd eerst)
-        self.tab_intro = TabIntro(self.app_state, self.create_work_tabs)
-        self.tabs.addTab(self.tab_intro, "Start")
-
-    
-    # --------------------------------------------------------
-    # Werk-tabs pas maken NA WC upload
-    # --------------------------------------------------------
-
-
+            QMessageBox.critical(self, "Fout", str(e))
 
     def create_work_tabs(self):
-        # voorkom dubbel aanmaken
-        if self.tabs.count() > 1:
-            return
+        self.tabs.clear()
+        self.tabs.addTab(self.intro_tab, "Start")
 
         self.tab_inboeken = TabInboeken(self.app_state)
-        self.tab_277 = TabWebsite277(self.app_state)
+        self.tab_tradelist = TabTradelist(self.app_state)
         self.tab_1322 = TabTLC1322(self.app_state)
         self.tab_tlc_update = TabTLCUpdate(self.app_state)
-        self.tab_tradelist = TabTradelist(self.app_state)
+        self.tab_website = TabWebsite277(self.app_state)
         self.tab_factuur = TabFactuurmaker(self.app_state)
         self.tab_zoeklijst = TabZoeklijst(self.app_state)
 
         self.tabs.addTab(self.tab_inboeken, "Inboeken")
-        self.tabs.addTab(self.tab_277, "Website 277")
-        self.tabs.addTab(self.tab_1322, "TLC 1322")
-        self.tabs.addTab(self.tab_tlc_update, "TLC Update")
         self.tabs.addTab(self.tab_tradelist, "Tradelist")
+        self.tabs.addTab(self.tab_1322, "1322")
+        self.tabs.addTab(self.tab_tlc_update, "TLC Update")
+        self.tabs.addTab(self.tab_website, "Website 277")
         self.tabs.addTab(self.tab_factuur, "Factuurmaker")
         self.tabs.addTab(self.tab_zoeklijst, "Zoeklijst")
 
-        # automatisch naar Inboeken
-        self.tabs.setCurrentIndex(1)
 
-
-
-# ============================================================
-# APP START
-# ============================================================
-
-    
 if __name__ == "__main__":
-
-
-    
-
-    import ctypes
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
         "classic.suzuki.parts.manager"
     )
 
     app = QApplication(sys.argv)
 
+    splash = create_splash(app)
+    splash_message(app, splash, "App starten...")
+
+    splash_message(app, splash, "Lokale mappen controleren...")
     appdata_root()
     output_root()
 
-        
+    splash_message(app, splash, "Controleren of de app al geopend is...")
     lock = create_single_instance_lock()
     if lock is None:
         sys.exit(0)
 
+    splash_message(app, splash, "Hoofdvenster laden...")
     window = MainWindow()
-    window.show()
     window.showMaximized()
+    app.processEvents()
+
+    splash_message(app, splash, "Controleren op updates...")
+    maybe_check_for_updates(window)
+
+    splash_message(app, splash, "Klaar met opstarten...")
+    splash.finish(window)
 
     sys.exit(app.exec())
