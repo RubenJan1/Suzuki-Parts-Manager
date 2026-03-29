@@ -1,0 +1,127 @@
+{
+  "batches": [
+    {
+      "batch_id": "20260313_091931",
+      "tab": "277",
+      "status": "IMPORTED",
+      "update_path": "output\\277\\WEBSITE_UPDATE_277_20260313_091931.xlsx",
+      "pick_path": "output\\277\\WEBSITE_PICKLIJST_277_20260313_091931.xlsx",
+      "tekort_path": "output\\277\\WEBSITE_TEKORT_277_20260313_091931.xlsx",
+      "stats_path": "output\\277\\DEBUG\\RUN_20260313_091931\\RUN_STATS_20260313_091931.xlsx",
+      "debug_changes_path": "output\\277\\DEBUG\\RUN_20260313_091931\\CHANGES_277_20260313_091931.xlsx",
+      "wc_path": "C:/Users/ruben/Downloads/wc-product-export-27-2-2026-1772200987668.csv",
+      "cms_paths": [
+        "C:/Users/ruben/Downloads/277-2087677.xlsx"
+      ],
+      "paths": [
+        "output\\277\\WEBSITE_UPDATE_277_20260313_091931.xlsx",
+        "output\\277\\WEBSITE_PICKLIJST_277_20260313_091931.xlsx",
+        "output\\277\\DEBUG\\RUN_20260313_091931\\WEBSITE_UITVERKOCHT_277_20260313_091931.xlsx",
+        "output\\277\\DEBUG\\RUN_20260313_091931\\RUN_STATS_20260313_091931.xlsx",
+        "output\\277\\WEBSITE_TEKORT_277_20260313_091931.xlsx"
+      ],
+      "merge_source": false,
+      "created_at": "2026-03-13T09:19:31",
+      "imported_at": "2026-03-13T09:19:48"
+    },
+    {
+      "batch_id": "20260313_091959",
+      "tab": "277",
+      "status": "IMPORTED",
+      "update_path": "output\\277\\WEBSITE_UPDATE_277_20260313_091959.xlsx",
+      "pick_path": "output\\277\\WEBSITE_PICKLIJST_277_20260313_091959.xlsx",
+      "tekort_path": "output\\277\\WEBSITE_TEKORT_277_20260313_091959.xlsx",
+      "stats_path": "output\\277\\DEBUG\\RUN_20260313_091959\\RUN_STATS_20260313_091959.xlsx",
+      "debug_changes_path": "output\\277\\DEBUG\\RUN_20260313_091959\\CHANGES_277_20260313_091959.xlsx",
+      "wc_path": "C:/Users/ruben/Downloads/wc-product-export-27-2-2026-1772200987668.csv",
+      "cms_paths": [
+        "C:/Users/ruben/Downloads/277-2088297.xlsx",
+        "C:/Users/ruben/Downloads/277-2088048 (1).xlsx"
+      ],
+      "paths": [
+        "output\\277\\WEBSITE_UPDATE_277_20260313_091959.xlsx",
+        "output\\277\\WEBSITE_PICKLIJST_277_20260313_091959.xlsx",
+        "output\\277\\DEBUG\\RUN_20260313_091959\\WEBSITE_UITVERKOCHT_277_20260313_091959.xlsx",
+        "output\\277\\DEBUG\\RUN_20260313_091959\\RUN_STATS_20260313_091959.xlsx",
+        "output\\277\\WEBSITE_TEKORT_277_20260313_091959.xlsx"
+      ],
+      "merge_source": false,
+      "created_at": "2026-03-13T09:19:59",
+      "imported_at": "2026-03-13T09:20:21"
+    },
+    {
+      "batch_id": "20260313_092028",
+      "tab": "277",
+      "status": "MERGED",
+      "update_path": "output\\277\\WEBSITE_UPDATE_277_20260313_092028.xlsx",
+      "pick_path": "output\\277\\WEBSITE_PICKLIJST_277_20260313_092028.xlsx",
+      "tekort_path": "output\\277\\WEBSITE_TEKORT_277_20260313_092028.xlsx",
+      "stats_path": "output\\277\\DEBUG\\RUN_20260313_092028\\RUN_STATS_20260313_092028.xlsx",
+      "debug_changes_path": "output\\277\\DEBUG\\RUN_20260313_092028\\CHANGES_277_20260313_092028.xlsx",
+      "wc_path": "C:/Users/ruben/Downloads/wc-product-export-27-2-2026-1772200987668.csv",
+      "cms_paths": [
+        "C:/Users/ruben/Downloads/277-2087779.xlsx"
+      ],
+      "paths": [
+        "output\\277\\WEBSITE_UPDATE_277_20260313_092028.xlsx",
+        "output\\277\\WEBSITE_PICKLIJST_277_20260313_092028.xlsx",
+        "output\\277\\DEBUG\\RUN_20260313_092028\\RUN_STATS_20260313_092028.xlsx",
+        "output\\277\\WEBSITE_TEKORT_277_20260313_092028.xlsx"
+      ],
+      "merge_source": false,
+      "created_at": "2026-03-13T09:20:28",
+      "merged_at": "2026-03-13T09:20:40",
+      "merged_into_batch_id": "277_MERGED_20260313_092040"
+    },
+    {
+      "batch_id": "20260313_092040",
+      "tab": "277",
+      "status": "MERGED",
+      "update_path": "output\\277\\WEBSITE_UPDATE_277_20260313_092040.xlsx",
+      "pick_path": "output\\277\\WEBSITE_PICKLIJST_277_20260313_092040.xlsx",
+      "tekort_path": "output\\277\\WEBSITE_TEKORT_277_20260313_092040.xlsx",
+      "stats_path": "output\\277\\DEBUG\\RUN_20260313_092040\\RUN_STATS_20260313_092040.xlsx",
+      "debug_changes_path": "output\\277\\DEBUG\\RUN_20260313_092040\\CHANGES_277_20260313_092040.xlsx",
+      "wc_path": "C:/Users/ruben/Downloads/wc-product-export-27-2-2026-1772200987668.csv",
+      "cms_paths": [
+        "C:/Users/ruben/Downloads/277-2088048 (1).xlsx"
+      ],
+      "paths": [
+        "output\\277\\WEBSITE_UPDATE_277_20260313_092040.xlsx",
+        "output\\277\\WEBSITE_PICKLIJST_277_20260313_092040.xlsx",
+        "output\\277\\DEBUG\\RUN_20260313_092040\\WEBSITE_UITVERKOCHT_277_20260313_092040.xlsx",
+        "output\\277\\DEBUG\\RUN_20260313_092040\\RUN_STATS_20260313_092040.xlsx",
+        "output\\277\\WEBSITE_TEKORT_277_20260313_092040.xlsx"
+      ],
+      "merge_source": false,
+      "created_at": "2026-03-13T09:20:40",
+      "merged_at": "2026-03-13T09:20:40",
+      "merged_into_batch_id": "277_MERGED_20260313_092040"
+    },
+    {
+      "batch_id": "277_MERGED_20260313_092040",
+      "tab": "277",
+      "status": "IMPORTED",
+      "update_path": "output\\277\\WEBSITE_UPDATE_277_MERGED_20260313_092040.xlsx",
+      "pick_path": "",
+      "tekort_path": "",
+      "stats_path": "",
+      "debug_changes_path": "output\\277\\DEBUG\\CHANGES_277_MERGED_20260313_092040.xlsx",
+      "wc_path": "C:/Users/ruben/Downloads/wc-product-export-27-2-2026-1772200987668.csv",
+      "cms_paths": [
+        "C:/Users/ruben/Downloads/277-2088048 (1).xlsx"
+      ],
+      "paths": [
+        "output\\277\\WEBSITE_UPDATE_277_MERGED_20260313_092040.xlsx",
+        "output\\277\\DEBUG\\CHANGES_277_MERGED_20260313_092040.xlsx"
+      ],
+      "merge_source": true,
+      "merged_from": [
+        "20260313_092028",
+        "20260313_092040"
+      ],
+      "created_at": "2026-03-13T09:20:40",
+      "imported_at": "2026-03-13T09:22:46"
+    }
+  ]
+}
