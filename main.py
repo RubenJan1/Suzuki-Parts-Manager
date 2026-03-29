@@ -19,18 +19,19 @@ from tabs.tab_tlc_update import TabTLCUpdate
 from tabs.tab_website_277 import TabWebsite277
 from tabs.tab_factuurmaker import TabFactuurmaker
 from tabs.tab_zoeklijst import TabZoeklijst
+from tabs.tab_intro import TabIntro
 
 from services.update_checker import check_github_release
+from services.auto_updater import run_updater
 from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO
 from utils.paths import resource_path, output_root, appdata_root, get_lock_file
-from services.auto_updater import run_updater
 
 
 def create_single_instance_lock():
     lock = QLockFile(str(get_lock_file()))
     lock.setStaleLockTime(0)
 
-    if not lock.tryLock():
+    if not lock.tryLock(0):
         QMessageBox.warning(None, "App al geopend", "Suzuki Parts Manager is al geopend.")
         return None
 
@@ -42,7 +43,6 @@ def create_splash(app: QApplication) -> QSplashScreen:
 
     pixmap = QPixmap(str(splash_path))
     if pixmap.isNull():
-        # fallback als splash.png nog niet bestaat
         pixmap = QPixmap(700, 380)
         pixmap.fill(Qt.white)
 
@@ -98,7 +98,6 @@ def maybe_check_for_updates(parent=None):
     if msg.clickedButton() == btn_download:
         target = info.download_url or info.release_url
         if target:
-
             run_updater(target)
 
 
@@ -115,44 +114,8 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
-        self.intro_tab = self.create_intro_tab()
+        self.intro_tab = TabIntro(self.app_state, self.create_work_tabs)
         self.tabs.addTab(self.intro_tab, "Start")
-
-    def create_intro_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-
-        label = QLabel("Upload WooCommerce export (.xlsx)")
-        btn = QPushButton("Selecteer bestand")
-        btn.clicked.connect(self.load_wc_export)
-
-        self.status_label = QLabel("Nog geen bestand geladen")
-
-        layout.addWidget(label)
-        layout.addWidget(btn)
-        layout.addWidget(self.status_label)
-
-        return widget
-
-    def load_wc_export(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Selecteer WooCommerce export",
-            "",
-            "Excel bestanden (*.xlsx)"
-        )
-
-        if not path:
-            return
-
-        try:
-            df = pd.read_excel(path)
-            self.app_state.set_wc_export(df, path)
-            self.status_label.setText(f"Geladen: {path}")
-            self.create_work_tabs()
-
-        except Exception as e:
-            QMessageBox.critical(self, "Fout", str(e))
 
     def create_work_tabs(self):
         self.tabs.clear()

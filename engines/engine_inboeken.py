@@ -1007,7 +1007,7 @@ class DebugLogger:
             **(data or {})
         }
         with open(self.events_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
     def bump(self, key: str, n: int = 1):
         if key in self.stats:
@@ -1060,9 +1060,9 @@ class InboekenEngine:
         self.debug.write_runlog_xlsx({
             "engine": "InboekenEngine",
             "run_id": self.debug.rid,
-            "output_dir": self.output_dir,
+            "output_dir": str(self.output_dir),
         })
-        self.debug.event("ENGINE_START", {"output_dir": self.output_dir})
+        self.debug.event("ENGINE_START", {"output_dir": str(self.output_dir)})
 
         self._autosave_dir = os.path.join(self.output_dir, "autosave")
         self._daily_autosave_dir = os.path.join(self.output_dir, "daily_autosave")
