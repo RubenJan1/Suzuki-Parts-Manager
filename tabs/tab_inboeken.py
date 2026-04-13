@@ -293,22 +293,6 @@ class TabInboeken(QWidget):
         # Productgegevens
         # -------------------------
 
-        gb_search = QGroupBox("Zoeken / Laden")
-        sbl = QVBoxLayout(gb_search)
-
-        r2 = QHBoxLayout()
-        r2.addWidget(QLabel("Zoeken op alles:"))
-        self.ed_quicksearch = QLineEdit()
-        self.ed_quicksearch.setPlaceholderText("Zoek op nummer, titel, beschrijving of locatie")
-        self.ed_quicksearch.returnPressed.connect(self.do_quicksearch)
-        r2.addWidget(self.ed_quicksearch)
-        btn2 = QPushButton("Popup")
-        btn2.clicked.connect(self.do_quicksearch)
-        r2.addWidget(btn2)
-        sbl.addLayout(r2)
-
-        rl.addWidget(gb_search)
-
         gb_data = QGroupBox("Productgegevens")
         dbl = QVBoxLayout(gb_data)
 
@@ -456,11 +440,6 @@ class TabInboeken(QWidget):
         # Verhoudingen: links voldoende ruimte voor zoeken + categorieën
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
-
-        self.btn_save.setObjectName("primary")
-        btn_clear.setObjectName("secondary")
-        btn_save_out.setObjectName("secondary")
-        btn_open_out.setObjectName("secondary")
 
         self._build_tree_from_json(CATEGORIES_TREE)
         self._update_selected_label()
