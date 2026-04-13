@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from engines.engine_inboeken import InboekenEngine, SearchHit, CATEGORIES_TREE, parse_price, round_up_to_5cent
-
+from utils.theme import apply_theme
 
 SEARCH_LIMIT = 500
 
@@ -175,103 +175,165 @@ class TabInboeken(QWidget):
             )
 
     def _build_ui(self):
-        root = QVBoxLayout(self)
+        apply_theme(self)
 
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
+
+        # =========================
+        # TITEL
+        # =========================
+        title = QLabel("Inboeken — Producten beheren")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        root.addWidget(title)
+
+        # =========================
+        # STATUS
+        # =========================
         self.lbl_status = QLabel("")
         f = QFont()
         f.setBold(True)
         self.lbl_status.setFont(f)
+        self.lbl_status.setWordWrap(True)
+        self.lbl_status.setStyleSheet("""
+            QLabel {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
         root.addWidget(self.lbl_status)
 
+        # =========================
+        # HOOFDWERKGEBIED
+        # =========================
         splitter = QSplitter(Qt.Horizontal)
-        root.addWidget(splitter)
+        root.addWidget(splitter, stretch=1)
 
-        # LEFT: categories
+        # ======================================================
+        # LINKS — ZOEKEN + CATEGORIEËN
+        # ======================================================
         left = QWidget()
         ll = QVBoxLayout(left)
+        ll.setSpacing(10)
+        ll.setContentsMargins(0, 0, 0, 0)
 
-        gb_cat = QGroupBox("Categorieën (Woo structuur)")
-        gbl = QVBoxLayout(gb_cat)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Filter:"))
-        self.ed_cat_filter = QLineEdit()
-        self.ed_cat_filter.setPlaceholderText("Typ om te filteren (bv. GT750, 2-takt, GSX...)")
-        self.ed_cat_filter.textChanged.connect(self._apply_tree_filter)
-        row.addWidget(self.ed_cat_filter)
-        btn_clear_filter = QPushButton("X")
-        btn_clear_filter.clicked.connect(lambda: self.ed_cat_filter.setText(""))
-        row.addWidget(btn_clear_filter)
-        gbl.addLayout(row)
-
-        self.tree = QTreeWidget()
-        self.tree.setHeaderHidden(True)
-        self.tree.itemChanged.connect(self.on_tree_item_changed)
-        gbl.addWidget(self.tree)
-
-        ll.addWidget(gb_cat)
-
-        splitter.addWidget(left)
-
-        # RIGHT: form
-        right = QWidget()
-        rl = QVBoxLayout(right)
-
+        # -------------------------
+        # Zoeken / Laden
+        # -------------------------
         gb_search = QGroupBox("Zoeken / Laden")
         sbl = QVBoxLayout(gb_search)
 
         r2 = QHBoxLayout()
         r2.addWidget(QLabel("Zoeken/Laden:"))
+
         self.ed_quicksearch = QLineEdit()
         self.ed_quicksearch.setPlaceholderText("Zoek op nummer of tekst (titel/korte beschrijving)")
         self.ed_quicksearch.returnPressed.connect(self.do_quicksearch)
         r2.addWidget(self.ed_quicksearch)
+
         btn2 = QPushButton("Popup")
+        btn2.setObjectName("secondary")
         btn2.clicked.connect(self.do_quicksearch)
         r2.addWidget(btn2)
+
         sbl.addLayout(r2)
+        ll.addWidget(gb_search)
 
-        rl.addWidget(gb_search)
+        # -------------------------
+        # Categorieën
+        # -------------------------
+        gb_cat = QGroupBox("Categorieën (Woo structuur)")
+        gbl = QVBoxLayout(gb_cat)
 
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Filter:"))
+
+        self.ed_cat_filter = QLineEdit()
+        self.ed_cat_filter.setPlaceholderText("Typ om te filteren (bv. GT750, 2-takt, GSX...)")
+        self.ed_cat_filter.textChanged.connect(self._apply_tree_filter)
+        row.addWidget(self.ed_cat_filter)
+
+        btn_clear_filter = QPushButton("X")
+        btn_clear_filter.setObjectName("secondary")
+        btn_clear_filter.clicked.connect(lambda: self.ed_cat_filter.setText(""))
+        row.addWidget(btn_clear_filter)
+
+        gbl.addLayout(row)
+
+        self.tree = QTreeWidget()
+        self.tree.setHeaderHidden(True)
+        self.tree.setUniformRowHeights(True)
+        self.tree.setAnimated(False)
+        self.tree.itemChanged.connect(self.on_tree_item_changed)
+        gbl.addWidget(self.tree)
+
+        ll.addWidget(gb_cat, stretch=1)
+
+        splitter.addWidget(left)
+
+        # ======================================================
+        # RECHTS — PRODUCTGEGEVENS + ACTIES + EXTRA + LOG
+        # ======================================================
+        right = QWidget()
+        rl = QVBoxLayout(right)
+        rl.setSpacing(10)
+        rl.setContentsMargins(0, 0, 0, 0)
+
+        # -------------------------
+        # Productgegevens
+        # -------------------------
         gb_data = QGroupBox("Productgegevens")
         dbl = QVBoxLayout(gb_data)
+
         r_title = QHBoxLayout()
         r_title.addWidget(QLabel("Title (onderdeelnummer):"))
+
         self.ed_title = QLineEdit()
         self.ed_title.textChanged.connect(self._refresh_validation)
         self.ed_title.setPlaceholderText("bv. 10001-18804")
         self.ed_title.returnPressed.connect(self.do_search_title)
         r_title.addWidget(self.ed_title)
+
         btn_load = QPushButton("Zoek / Laad")
+        btn_load.setObjectName("primary")
         btn_load.clicked.connect(self.do_search_title)
         r_title.addWidget(btn_load)
-        dbl.addLayout(r_title)
 
+        dbl.addLayout(r_title)
 
         r3 = QHBoxLayout()
         r3.addWidget(QLabel("Voorraad:"))
+
         self.ed_stock = QLineEdit()
         self.ed_stock.textChanged.connect(self._refresh_validation)
         r3.addWidget(self.ed_stock)
 
         r3.addWidget(QLabel("Prijs:"))
+
         self.ed_price = QLineEdit()
         self.ed_price.textChanged.connect(self._refresh_validation)
         r3.addWidget(self.ed_price)
 
         btn_kort_11 = QPushButton("-11%")
+        btn_kort_11.setObjectName("secondary")
         btn_kort_11.setFixedWidth(55)
         btn_kort_11.clicked.connect(lambda: self.apply_discount(11))
         r3.addWidget(btn_kort_11)
 
         r3.addWidget(QLabel("Locatie:"))
+
         self.ed_location = QLineEdit()
         self.ed_location.setPlaceholderText("bv. D33, PD12, GB 1, K 13")
         self.ed_location.textChanged.connect(self._refresh_validation)
         r3.addWidget(self.ed_location)
+
         dbl.addLayout(r3)
 
         dbl.addWidget(QLabel("Korte beschrijving:"))
+
         self.ed_desc = QTextEdit()
         self.ed_desc.setMinimumHeight(90)
         self.ed_desc.textChanged.connect(self._refresh_validation)
@@ -280,29 +342,39 @@ class TabInboeken(QWidget):
         rl.addWidget(gb_data)
 
         self.lbl_selected = QLabel("Geselecteerde categorieën: (0)")
+        self.lbl_selected.setWordWrap(True)
         rl.addWidget(self.lbl_selected)
 
+        # -------------------------
         # Acties op product
+        # -------------------------
         row_actions = QHBoxLayout()
+
         self.btn_save = QPushButton("Toevoegen / Updaten")
+        self.btn_save.setObjectName("primary")
         self.btn_save.clicked.connect(self.on_add_update)
         row_actions.addWidget(self.btn_save)
 
         btn_clear = QPushButton("Leegmaken")
+        btn_clear.setObjectName("secondary")
         btn_clear.clicked.connect(self.on_clear)
         row_actions.addWidget(btn_clear)
 
         row_actions.addStretch(1)
         rl.addLayout(row_actions)
 
+        # -------------------------
         # Bestanden / output
+        # -------------------------
         row_files = QHBoxLayout()
 
         btn_save_out = QPushButton("Output opslaan…")
+        btn_save_out.setObjectName("secondary")
         btn_save_out.clicked.connect(self.on_save_output)
         row_files.addWidget(btn_save_out)
 
         btn_open_out = QPushButton("Open output map")
+        btn_open_out.setObjectName("secondary")
         btn_open_out.clicked.connect(
             lambda: self._open_output_folder(self.engine.output_dir)
         )
@@ -311,42 +383,59 @@ class TabInboeken(QWidget):
         row_files.addStretch(1)
         rl.addLayout(row_files)
 
+        # -------------------------
+        # Zedder / Reiner
+        # -------------------------
         gb_ext = QGroupBox("Zedder / Reiner")
         exl = QVBoxLayout(gb_ext)
 
         exl.addWidget(QLabel("Zedder (plakken):"))
+
         self.zedder_text = QTextEdit()
         self.zedder_text.setMinimumHeight(110)
         exl.addWidget(self.zedder_text)
 
         rz = QHBoxLayout()
+
         btn_z_models = QPushButton("Zedder → Categorieën")
+        btn_z_models.setObjectName("secondary")
         btn_z_models.clicked.connect(self.on_zedder_categories)
+
         btn_z_fill = QPushButton("Zedder → Title + Desc")
+        btn_z_fill.setObjectName("secondary")
         btn_z_fill.clicked.connect(self.on_zedder_fill)
+
         btn_reiners = QPushButton("Reiner → Prijs + Categorieën")
+        btn_reiners.setObjectName("secondary")
         btn_reiners.clicked.connect(self.on_reiners)
 
         rz.addWidget(btn_z_models)
         rz.addWidget(btn_z_fill)
         rz.addWidget(btn_reiners)
         rz.addStretch(1)
-        exl.addLayout(rz)
 
+        exl.addLayout(rz)
         rl.addWidget(gb_ext)
 
+        # -------------------------
+        # Log
+        # -------------------------
         rl.addWidget(QLabel("Log"))
+
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         self.log.setMinimumHeight(120)
         rl.addWidget(self.log)
 
         splitter.addWidget(right)
+
+        # Verhoudingen: links voldoende ruimte voor zoeken + categorieën
+        splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
+        splitter.setSizes([420, 760])
 
         self._build_tree_from_json(CATEGORIES_TREE)
         self._update_selected_label()
-
     # ------------- Categories Tree -------------
 
     def _build_tree_from_json(self, nodes: list):

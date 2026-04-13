@@ -20,6 +20,7 @@ from PySide6.QtCore import Qt
 import os
 from datetime import datetime
 from utils.paths import output_root
+from utils.theme import apply_theme
 
 BASE_DIR = str(output_root() / "1322")
 
@@ -36,121 +37,130 @@ class TabTLC1322(QWidget):
     # UI
     # --------------------------------------------------------
     def _build_ui(self):
-        main = QVBoxLayout(self)
-        main.setSpacing(14)
-        main.setContentsMargins(20, 20, 20, 20)
+        apply_theme(self)
 
-        # ----------------------------------------------------
-        # Titel
-        # ----------------------------------------------------
-        title = QLabel("TLC / 1322 – Interne verkoop (maandlijst)")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
+
+        # =========================
+        # TITEL
+        # =========================
+        title = QLabel("TLC / 1322 – Interne verkoop")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        root.addWidget(title)
 
+        # =========================
+        # UITLEG
+        # =========================
         uitleg = QLabel(
-            "Deze tool verwerkt interne verkopen (1322).\n\n"
-            "• De PICKLIJST bevat ALLE bestelde artikelen\n"
-            "• TLC_NIEUW bevat alleen volledig leverbare artikelen\n"
-            "• UITVERKOCHT toont tekorten en artikelen met voorraad 0\n\n"
-            "Omdat dit een maandlijst is, kunnen tekorten voorkomen."
+            "Verwerkt interne verkopen (1322) op basis van de actieve TLC.\n\n"
+            "① Controleer of TLC_1.xlsx aanwezig is\n"
+            "② Voeg CMS 1322 bestanden toe\n"
+            "③ Start verwerking\n\n"
+            "Output:\n"
+            "• Picklijst = alle bestelde artikelen\n"
+            "• TLC_NIEUW = volledig leverbare artikelen\n"
+            "• UITVERKOCHT = tekorten en voorraad 0"
         )
         uitleg.setWordWrap(True)
-        uitleg.setStyleSheet("color: #555;")
+        root.addWidget(uitleg)
 
-        main.addWidget(title)
-        main.addWidget(uitleg)
-
-        # ----------------------------------------------------
-        # Stap 1 – TLC basislijst
-        # ----------------------------------------------------
-        step1 = QLabel("① TLC basislijst (automatisch)")
-        step1.setStyleSheet("font-size: 14px; font-weight: bold;")
-        main.addWidget(step1)
-
-        row1 = QHBoxLayout()
-        btn_tlc = QPushButton("📂 Open TLC map (alleen bekijken)")
-        btn_tlc.setFixedHeight(30)
-        btn_tlc.setStyleSheet("font-size: 11px;")
-        btn_tlc.clicked.connect(self.on_upload_tlc)
-
-        btn_reset = QPushButton("Reset alles")
-        btn_reset.clicked.connect(self.on_reset)
-
-        row1.addWidget(btn_tlc)
-        row1.addWidget(btn_reset)
-        row1.addStretch()
-        main.addLayout(row1)
-
+        # =========================
+        # STATUS BLOK
+        # =========================
         self.lbl_tlc = QLabel("❌ Nog geen TLC basislijst geladen")
         self.lbl_tlc.setWordWrap(True)
-        self.lbl_tlc.setStyleSheet(
-            """
+        self.lbl_tlc.setStyleSheet("""
             QLabel {
-                background-color: palette(base);
-                color: palette(text);
+                background: palette(base);
                 border: 1px solid palette(mid);
-                padding: 8px;
+                border-radius: 8px;
+                padding: 10px;
             }
-            """
-        )
+        """)
+        root.addWidget(self.lbl_tlc)
 
-        main.addWidget(self.lbl_tlc)
         self.lbl_tlc_warning = QLabel(
-            "⚠️ Let op: open TLC_1.xlsx NIET in Excel tijdens het verwerken.\n"
-            "Als het bestand open staat krijg je 'Permission denied'."
+            "⚠️ Let op: open TLC_1.xlsx niet in Excel tijdens verwerken."
         )
         self.lbl_tlc_warning.setWordWrap(True)
-        self.lbl_tlc_warning.setStyleSheet("color:#aa0000; font-weight:bold;")
-        main.addWidget(self.lbl_tlc_warning)
-
-        # ----------------------------------------------------
-        # Stap 2 – CMS 1322
-        # ----------------------------------------------------
-        step2 = QLabel("② CMS 1322 bestellingen")
-        step2.setStyleSheet("font-size: 14px; font-weight: bold;")
-        main.addWidget(step2)
-
-        row2 = QHBoxLayout()
-        btn_cms = QPushButton("Add CMS 1322 orders (.xlsx)")
-        btn_cms.setFixedHeight(36)
-        btn_cms.clicked.connect(self.on_add_cms)
-
-        row2.addWidget(btn_cms)
-        row2.addStretch()
-        main.addLayout(row2)
+        self.lbl_tlc_warning.setStyleSheet("""
+            QLabel {
+                background: rgba(255, 170, 0, 0.14);
+                border: 1px solid rgba(255, 170, 0, 0.35);
+                border-radius: 8px;
+                padding: 10px;
+                color: #b06a00;
+                font-weight: bold;
+            }
+        """)
+        root.addWidget(self.lbl_tlc_warning)
 
         self.lbl_cms = QLabel("0 CMS 1322 bestand(en) toegevoegd")
-        self.lbl_cms.setStyleSheet("color:#555;")
-        main.addWidget(self.lbl_cms)
+        self.lbl_cms.setWordWrap(True)
+        self.lbl_cms.setStyleSheet("""
+            QLabel {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        root.addWidget(self.lbl_cms)
 
-        # ----------------------------------------------------
-        # Stap 3 – Run
-        # ----------------------------------------------------
-        step3 = QLabel("③ Verwerken")
-        step3.setStyleSheet("font-size: 14px; font-weight: bold;")
-        main.addWidget(step3)
+        # =========================
+        # ACTIES BOVEN
+        # =========================
+        row_actions = QHBoxLayout()
 
-        row3 = QHBoxLayout()
+        btn_tlc = QPushButton("Open TLC map")
+        btn_tlc.setObjectName("secondary")
+        btn_tlc.clicked.connect(self.on_upload_tlc)
+
+        btn_cms = QPushButton("Add CMS 1322 orders")
+        btn_cms.setObjectName("primary")
+        btn_cms.clicked.connect(self.on_add_cms)
+
+        btn_reset = QPushButton("Reset alles")
+        btn_reset.setObjectName("secondary")
+        btn_reset.clicked.connect(self.on_reset)
+
+        row_actions.addWidget(btn_tlc)
+        row_actions.addWidget(btn_cms)
+        row_actions.addWidget(btn_reset)
+        row_actions.addStretch()
+
+        root.addLayout(row_actions)
+
+        # =========================
+        # RUN ACTIES
+        # =========================
+        row_run = QHBoxLayout()
+
         btn_run = QPushButton("Start 1322 verwerking")
-        btn_run.setFixedHeight(42)
-        btn_run.setStyleSheet("font-weight: bold;")
+        btn_run.setObjectName("primary")
+        btn_run.setMinimumHeight(40)
         btn_run.clicked.connect(self.on_run)
 
         btn_open = QPushButton("Open output folder")
+        btn_open.setObjectName("secondary")
         btn_open.clicked.connect(self.on_open_output)
 
-        row3.addWidget(btn_run)
-        row3.addWidget(btn_open)
-        row3.addStretch()
-        main.addLayout(row3)
+        row_run.addWidget(btn_run)
+        row_run.addWidget(btn_open)
+        row_run.addStretch()
 
-        # ----------------------------------------------------
-        # Log
-        # ----------------------------------------------------
+        root.addLayout(row_run)
+
+        # =========================
+        # LOG
+        # =========================
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         self.log.setMinimumHeight(180)
         self.log.setPlaceholderText("Log verschijnt hier...")
-        main.addWidget(self.log, stretch=1)
+        root.addWidget(self.log, stretch=1)
 
         self._sync_labels()
 
@@ -226,7 +236,7 @@ class TabTLC1322(QWidget):
             "1322 verwerking is succesvol afgerond."
         )
 
-        # na run resetten voor nieuwe batch
+        
         self.on_reset()
 
     def on_reset(self):

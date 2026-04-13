@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QMessageBox, QFrame
 )
-
+from utils.theme import apply_theme
 
 def extract_export_date_from_filename(path: str):
     """
@@ -73,94 +73,112 @@ class TabIntro(QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(12)
+        apply_theme(self)
 
-        title = QLabel("Welkom – Suzuki Parts Tools")
-        title.setStyleSheet("font-size: 22px; font-weight: bold;")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
+        # =========================
+        # TITEL
+        # =========================
+        title = QLabel("Start — WooCommerce export laden")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        root.addWidget(title)
+
+        # =========================
+        # UITLEG
+        # =========================
         uitleg = QLabel(
-            "Laad eerst de WooCommerce product-export (CSV). "
-            "Deze export wordt gebruikt als controlebron voor zoeken, inboeken, "
-            "website-acties en TLC. Gebruik bij voorkeur de export van vandaag. "
-            "Een oudere export mag wel geladen worden, maar geeft een waarschuwing."
+            "Laad eerst de WooCommerce product-export (CSV).\n\n"
+            "Deze export is de basis voor zoeken, inboeken, website-acties en TLC.\n"
+            "Gebruik bij voorkeur de export van vandaag. Een oudere export mag ook, "
+            "maar dan krijg je een waarschuwing."
         )
         uitleg.setWordWrap(True)
-        uitleg.setStyleSheet("font-size: 13px; color: palette(text);")
+        root.addWidget(uitleg)
 
-        layout.addWidget(title)
-        layout.addWidget(uitleg)
+        # =========================
+        # STAPPEN / INFO BLOK
+        # =========================
+        stappen = QLabel(
+            "Werkwijze:\n"
+            "① Maak of download een WooCommerce CSV export\n"
+            "② Klik op 'Upload WooCommerce CSV export'\n"
+            "③ Controleer bestand, datum en aantallen\n"
+            "④ Daarna worden de andere tabs bruikbaar"
+        )
+        stappen.setWordWrap(True)
+        stappen.setStyleSheet("""
+            QLabel {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        root.addWidget(stappen)
 
-        cards = QHBoxLayout()
-        cards.setSpacing(10)
-        cards.addWidget(make_card(
-            "Stap 1 — Export maken",
-            "Maak in WooCommerce een product-export als CSV en download het bestand."
-        ))
-        cards.addWidget(make_card(
-            "Stap 2 — Export laden",
-            "Klik hieronder op de uploadknop en selecteer de WooCommerce CSV-export."
-        ))
-        cards.addWidget(make_card(
-            "Let op — Oude export",
-            "Een oude export mag gebruikt worden om fouten op de site terug te zoeken. "
-            "De app waarschuwt dan, maar blokkeert niet."
-        ))
-        layout.addLayout(cards)
-
+        # =========================
+        # ACTIE
+        # =========================
         self.btn_upload = QPushButton("Upload WooCommerce CSV export")
+        self.btn_upload.setObjectName("primary")
         self.btn_upload.setMinimumHeight(40)
         self.btn_upload.clicked.connect(self.load_wc_export)
+        root.addWidget(self.btn_upload)
 
+        # =========================
+        # STATUS BLOK
+        # =========================
         self.status = QLabel("Nog geen WooCommerce export geladen")
         self.status.setWordWrap(True)
         self.status.setStyleSheet("""
             QLabel {
-                font-size: 13px;
-                font-weight: bold;
-                color: palette(text);
-                padding: 8px;
                 background: palette(base);
                 border: 1px solid palette(mid);
                 border-radius: 8px;
+                padding: 10px;
+                font-weight: bold;
             }
         """)
+        root.addWidget(self.status)
 
+        # =========================
+        # BESTANDSINFO
+        # =========================
         self.file_info = QLabel("")
         self.file_info.setWordWrap(True)
         self.file_info.hide()
         self.file_info.setStyleSheet("""
             QLabel {
-                font-size: 12px;
-                color: palette(text);
-                padding: 10px;
                 background: palette(base);
                 border: 1px solid palette(mid);
                 border-radius: 8px;
+                padding: 10px;
             }
         """)
+        root.addWidget(self.file_info)
 
+        # =========================
+        # WAARSCHUWING
+        # =========================
         self.export_warning = QLabel("")
         self.export_warning.setWordWrap(True)
         self.export_warning.hide()
         self.export_warning.setStyleSheet("""
             QLabel {
-                font-size: 12px;
-                font-weight: bold;
-                color: #b06a00;
-                padding: 10px;
                 background: rgba(255, 170, 0, 0.14);
                 border: 1px solid rgba(255, 170, 0, 0.35);
                 border-radius: 8px;
+                padding: 10px;
+                color: #b06a00;
+                font-weight: bold;
             }
         """)
+        root.addWidget(self.export_warning)
 
-        layout.addSpacing(8)
-        layout.addWidget(self.btn_upload)
-        layout.addWidget(self.status)
-        layout.addWidget(self.file_info)
-        layout.addWidget(self.export_warning)
-        layout.addStretch()
+        root.addStretch()
 
     def load_wc_export(self):
         path, _ = QFileDialog.getOpenFileName(

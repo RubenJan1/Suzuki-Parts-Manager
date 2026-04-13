@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 
 from engines.engine_zoeklijst import EngineZoeklijst, extract_part_numbers_from_text, extract_part_numbers_from_xlsx
 from utils.paths import output_root
+from utils.theme import apply_theme
 
 class TabZoeklijst(QWidget):
     def __init__(self, app_state, parent=None):
@@ -57,85 +58,130 @@ class TabZoeklijst(QWidget):
         self.lbl_status.setText(f"WC export {wc_ok} | TLC masterlijst {tlc_ok}")
 
     def _build_ui(self):
+        apply_theme(self)
+
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        top = QHBoxLayout()
-        lbl_title = QLabel("Zoeklijst — Mail / XLSX parser")
-        lbl_title.setStyleSheet("font-size: 18px; font-weight: 600;")
-        top.addWidget(lbl_title)
-        top.addStretch(1)
+        # =========================
+        # TITEL
+        # =========================
+        title = QLabel("Zoeklijst — Mail / XLSX parser")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        root.addWidget(title)
 
-        self.btn_open_output = QPushButton("📁 Open output folder")
-        self.btn_open_output.clicked.connect(self.open_output_folder)
-        top.addWidget(self.btn_open_output)
+        # =========================
+        # UITLEG
+        # =========================
+        uitleg = QLabel(
+            "Zoek part numbers uit geplakte tekst of een Excel-bestand.\n\n"
+            "① Controleer of de WC export geladen is\n"
+            "② Laad optioneel een TLC masterlijst\n"
+            "③ Upload een zoeklijst of plak tekst\n"
+            "④ Maak een XLSX report"
+        )
+        uitleg.setWordWrap(True)
+        root.addWidget(uitleg)
 
-        root.addLayout(top)
-
+        # =========================
+        # STATUS BLOK
+        # =========================
         self.lbl_status = QLabel("WC export ❌ | TLC masterlijst ❌")
-        self.lbl_status.setStyleSheet("opacity: 0.85;")
+        self.lbl_status.setWordWrap(True)
+        self.lbl_status.setStyleSheet("""
+            QLabel {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
         root.addWidget(self.lbl_status)
 
-        # Input row (hier zat jouw bug)
-        inp_row = QHBoxLayout()
+        # =========================
+        # ACTIES BOVEN
+        # =========================
+        row_actions = QHBoxLayout()
 
-        self.btn_load_tlc_master = QPushButton("📦 Laad TLC masterlijst (XLSX)…")
+        self.btn_open_output = QPushButton("Open output folder")
+        self.btn_open_output.setObjectName("secondary")
+        self.btn_open_output.clicked.connect(self.open_output_folder)
+
+        self.btn_load_tlc_master = QPushButton("Laad TLC masterlijst")
+        self.btn_load_tlc_master.setObjectName("secondary")
         self.btn_load_tlc_master.clicked.connect(self.on_load_tlc_master)
-        inp_row.addWidget(self.btn_load_tlc_master)
 
-        self.btn_load_xlsx = QPushButton("Upload zoeklijst (XLSX)…")
+        self.btn_load_xlsx = QPushButton("Upload zoeklijst")
+        self.btn_load_xlsx.setObjectName("secondary")
         self.btn_load_xlsx.clicked.connect(self.on_load_xlsx)
-        inp_row.addWidget(self.btn_load_xlsx)
 
         self.btn_parse_text = QPushButton("Parse pasted text")
+        self.btn_parse_text.setObjectName("primary")
         self.btn_parse_text.clicked.connect(self.on_parse_text)
-        inp_row.addWidget(self.btn_parse_text)
 
-        inp_row.addStretch(1)
+        row_actions.addWidget(self.btn_open_output)
+        row_actions.addWidget(self.btn_load_tlc_master)
+        row_actions.addWidget(self.btn_load_xlsx)
+        row_actions.addWidget(self.btn_parse_text)
+        row_actions.addStretch()
 
-        self.btn_build = QPushButton("Maak XLSX report")
-        self.btn_build.setStyleSheet("font-weight: 600; padding: 8px 14px;")
-        self.btn_build.clicked.connect(self.on_build_report)
-        inp_row.addWidget(self.btn_build)
+        root.addLayout(row_actions)
 
-        root.addLayout(inp_row)
-
-        self.txt_paste = QTextEdit()
-        self.txt_paste.setPlaceholderText(
-            "Plak hier een lijst… (part numbers met of zonder streepjes)\n"
-            "Tip: je mag de omschrijvingen laten staan; we vissen alleen de nummers eruit."
-        )
-
-        # auto-load TLC uit vaste map (hufterproof)
+        # auto-load TLC uit vaste map
         tlc_path = str(output_root() / "1322" / "TLC" / "TLC_1.xlsx")
         if os.path.exists(tlc_path):
             try:
                 self.engine.load_tlc_xlsx(tlc_path)
             except Exception as e:
                 self.lbl_status.setText(f"TLC auto-load fout: {e}")
+
         self._update_status()
 
-        self.txt_paste.setMinimumHeight(200)
+        # =========================
+        # INPUT
+        # =========================
+        self.txt_paste = QTextEdit()
+        self.txt_paste.setPlaceholderText(
+            "Plak hier een lijst… (part numbers met of zonder streepjes)\n"
+            "Je mag omschrijvingen laten staan; alleen de nummers worden gebruikt."
+        )
+        self.txt_paste.setMinimumHeight(180)
         root.addWidget(self.txt_paste)
 
+        # =========================
+        # RESULTATEN TABEL
+        # =========================
         self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["Part number", "Source", "Found", "Stock", "Price", "Locatie", "Notes"])
+        self.table.setHorizontalHeaderLabels([
+            "Part number", "Source", "Found", "Stock", "Price", "Locatie", "Notes"
+        ])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         root.addWidget(self.table, stretch=1)
 
-        bottom = QHBoxLayout()
-        bottom.addWidget(QLabel("Output:"))
+        # =========================
+        # OUTPUT BLOK
+        # =========================
+        row_output = QHBoxLayout()
+
+        row_output.addWidget(QLabel("Output bestandsnaam:"))
+
         self.ed_filename = QLineEdit("zoeklijst_report.xlsx")
         self.ed_filename.setPlaceholderText("Bestandsnaam output")
-        bottom.addWidget(self.ed_filename, stretch=1)
+        row_output.addWidget(self.ed_filename, stretch=1)
+
+        self.btn_build = QPushButton("Maak XLSX report")
+        self.btn_build.setObjectName("primary")
+        self.btn_build.clicked.connect(self.on_build_report)
+        row_output.addWidget(self.btn_build)
 
         self.btn_open_last = QPushButton("Open laatste output")
+        self.btn_open_last.setObjectName("secondary")
         self.btn_open_last.clicked.connect(self.open_last_output)
-        bottom.addWidget(self.btn_open_last)
+        row_output.addWidget(self.btn_open_last)
 
-        root.addLayout(bottom)
+        root.addLayout(row_output)
 
     def _ensure_wc_loaded(self) -> bool:
         if getattr(self.app_state, "wc_df", None) is None:

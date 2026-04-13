@@ -1,15 +1,14 @@
-# utils/theme.py
-
 from PySide6.QtGui import QPalette
 
-
-def is_dark(widget):
+def is_dark_mode(widget):
     bg = widget.palette().color(QPalette.Window)
     return bg.lightness() < 128
 
 
 def apply_theme(widget):
-    if is_dark(widget):
+    dark = is_dark_mode(widget)
+
+    if dark:
         style = """
         QWidget {
             background-color: #111827;
@@ -17,20 +16,20 @@ def apply_theme(widget):
             font-size: 10pt;
         }
 
-        QLabel {
-            color: #E5E7EB;
-        }
+        QLabel { color: #E5E7EB; }
 
-        QLineEdit, QTextEdit, QComboBox, QDoubleSpinBox {
+        QLineEdit, QTextEdit, QComboBox {
             background-color: #0B1220;
+            color: #E5E7EB;
             border: 1px solid #273244;
             padding: 6px;
-            border-radius: 6px;
+            border-radius: 4px;
         }
 
         QPushButton {
             padding: 6px 12px;
-            border-radius: 6px;
+            border-radius: 4px;
+            min-height: 30px;
         }
 
         QPushButton#primary {
@@ -38,14 +37,24 @@ def apply_theme(widget):
             color: white;
         }
 
+        QPushButton#secondary {
+            background-color: #1F2937;
+            border: 1px solid #273244;
+        }
+
         QPushButton#danger {
             background-color: #DC2626;
             color: white;
         }
 
-        QPushButton#secondary {
-            background-color: #1F2937;
+        QTableWidget {
+            background-color: #0B1220;
             border: 1px solid #273244;
+        }
+
+        QHeaderView::section {
+            background-color: #0E172A;
+            padding: 6px;
         }
         """
     else:
@@ -56,20 +65,11 @@ def apply_theme(widget):
             font-size: 10pt;
         }
 
-        QLabel {
-            color: #111827;
-        }
-
-        QLineEdit, QTextEdit, QComboBox, QDoubleSpinBox {
+        QLineEdit, QTextEdit, QComboBox {
             background-color: white;
             border: 1px solid #D1D5DB;
             padding: 6px;
-            border-radius: 6px;
-        }
-
-        QPushButton {
-            padding: 6px 12px;
-            border-radius: 6px;
+            border-radius: 4px;
         }
 
         QPushButton#primary {
@@ -77,14 +77,14 @@ def apply_theme(widget):
             color: white;
         }
 
-        QPushButton#danger {
-            background-color: #DC2626;
-            color: white;
-        }
-
         QPushButton#secondary {
             background-color: white;
             border: 1px solid #D1D5DB;
+        }
+
+        QPushButton#danger {
+            background-color: #DC2626;
+            color: white;
         }
         """
 
