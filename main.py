@@ -25,7 +25,8 @@ from services.update_checker import check_github_release
 from services.auto_updater import run_updater
 from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO
 from utils.paths import resource_path, output_root, appdata_root, get_lock_file
-
+from tabs.tab_intro import TabIntro
+from utils.theme import apply_theme
 
 def create_single_instance_lock():
     lock = QLockFile(str(get_lock_file()))
@@ -114,8 +115,12 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
+        apply_theme(self)
+
+        # ✅ JUISTE Intro tab
         self.intro_tab = TabIntro(self.app_state, self.create_work_tabs)
         self.tabs.addTab(self.intro_tab, "Start")
+
 
     def create_work_tabs(self):
         self.tabs.clear()

@@ -22,6 +22,8 @@ from services.batch_merge_277 import (
     build_update_from_changes,
     save_merged_files,
 )
+from utils.paths import output_root
+from utils.theme import apply_theme
 
 class TabWebsite277(QWidget):
     def __init__(self, app_state):
@@ -35,99 +37,110 @@ class TabWebsite277(QWidget):
     # UI
     # --------------------------------------------------------
     def _build_ui(self):
-        main = QVBoxLayout(self)
-        main.setSpacing(14)
-        main.setContentsMargins(20, 20, 20, 20)
+        apply_theme(self)
 
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
+
+        # =========================
+        # TITEL
+        # =========================
         title = QLabel("Website / 277 – Voorraad afboeken")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        root.addWidget(title)
 
+        # =========================
+        # UITLEG
+        # =========================
         uitleg = QLabel(
-            "Deze tool verwerkt website/CMS-bestellingen (277).\n\n"
-            "Stappen:\n"
-            "① Controleer dat WC-export geladen is\n"
-            "② Voeg CMS 277 orders toe\n"
+            "Verwerkt website/CMS bestellingen (277).\n\n"
+            "① Zorg dat WooCommerce export geladen is\n"
+            "② Voeg CMS bestanden toe\n"
             "③ Start afboeken\n\n"
             "• Alleen voorraad wordt aangepast\n"
-            "• Prijzen blijven ongewijzigd\n"
             "• Tekorten worden apart gelogd"
         )
         uitleg.setWordWrap(True)
-        uitleg.setStyleSheet("color:#555;")
+        root.addWidget(uitleg)
 
-        main.addWidget(title)
-        main.addWidget(uitleg)
-
-        # WC info
+        # =========================
+        # STATUS BLOK
+        # =========================
         self.lbl_wc = QLabel()
-        self._update_wc()
-        self.lbl_wc.setStyleSheet("""
-            QLabel {
-            background-color: palette(base);
-            color: palette(text);
-            border: 1px solid palette(mid);
-            padding: 8px;
-            }
-        """)
-
-        main.addWidget(self.lbl_wc)
-
-        # Open batch info
         self.lbl_batch = QLabel()
-        self.lbl_batch.setWordWrap(True)
-        self.lbl_batch.setStyleSheet("""
-            QLabel {
-                background-color: palette(base);
-                color: palette(text);
-                border: 1px solid palette(mid);
-                padding: 8px;
-            }
-        """)
-        main.addWidget(self.lbl_batch)
+
+        for lbl in (self.lbl_wc, self.lbl_batch):
+            lbl.setWordWrap(True)
+            lbl.setStyleSheet("""
+                QLabel {
+                    background: palette(base);
+                    border: 1px solid palette(mid);
+                    border-radius: 8px;
+                    padding: 10px;
+                }
+            """)
+
+        root.addWidget(self.lbl_wc)
+        root.addWidget(self.lbl_batch)
+
+        self._update_wc()
         self._update_batch_status()
 
-        # Upload
-        row1 = QHBoxLayout()
-        btn_add = QPushButton("Add CMS 277 orders (.xlsx)")
-        btn_add.setFixedHeight(36)
+        # =========================
+        # ACTIES (boven)
+        # =========================
+        row_actions = QHBoxLayout()
+
+        btn_add = QPushButton("Add CMS 277 orders")
+        btn_add.setObjectName("primary")
         btn_add.clicked.connect(self.on_add)
 
         btn_reset = QPushButton("Reset")
+        btn_reset.setObjectName("secondary")
         btn_reset.clicked.connect(self.on_reset)
 
-        row1.addWidget(btn_add)
-        row1.addWidget(btn_reset)
-        row1.addStretch()
-        main.addLayout(row1)
+        self.lbl_count = QLabel("0 bestanden geladen")
 
-        self.lbl_count = QLabel("0 CMS 277 bestand(en) toegevoegd")
-        self.lbl_count.setStyleSheet("color:#555;")
-        main.addWidget(self.lbl_count)
+        row_actions.addWidget(btn_add)
+        row_actions.addWidget(btn_reset)
+        row_actions.addStretch()
+        row_actions.addWidget(self.lbl_count)
 
-        # Run
-        row2 = QHBoxLayout()
-        btn_run = QPushButton("Start 277 afboeken")
-        btn_run.setFixedHeight(42)
-        btn_run.setStyleSheet("font-weight:bold;")
+        root.addLayout(row_actions)
+
+        # =========================
+        # RUN ACTIES (duidelijk)
+        # =========================
+        row_run = QHBoxLayout()
+
+        btn_run = QPushButton("Start afboeken")
+        btn_run.setObjectName("primary")
+        btn_run.setMinimumHeight(40)
         btn_run.clicked.connect(self.on_run)
 
-        btn_open = QPushButton("Open output folder")
+        btn_open = QPushButton("Open output")
+        btn_open.setObjectName("secondary")
         btn_open.clicked.connect(self.on_open_output)
 
-        btn_mark = QPushButton("Markeer batch als geïmporteerd")
+        btn_mark = QPushButton("Markeer als geïmporteerd")
+        btn_mark.setObjectName("secondary")
         btn_mark.clicked.connect(self.on_mark_imported)
 
-        row2.addWidget(btn_run)
-        row2.addWidget(btn_open)
-        row2.addWidget(btn_mark)
-        row2.addStretch()
-        main.addLayout(row2)
+        row_run.addWidget(btn_run)
+        row_run.addWidget(btn_open)
+        row_run.addWidget(btn_mark)
+        row_run.addStretch()
 
-        # Log
+        root.addLayout(row_run)
+
+        # =========================
+        # LOG
+        # =========================
         self.log = QTextEdit()
         self.log.setReadOnly(True)
-        self.log.setMinimumHeight(180)
-        main.addWidget(self.log, stretch=1)
+        self.log.setPlaceholderText("Log verschijnt hier...")
+        root.addWidget(self.log, stretch=1)
 
         self._sync_label()
 
@@ -373,6 +386,6 @@ class TabWebsite277(QWidget):
         self._update_batch_status()
 
     def on_open_output(self):
-        folder = os.path.abspath(os.path.join("output", "277"))
-        os.makedirs(folder, exist_ok=True)
-        os.startfile(folder)
+        folder = output_root() / "277"
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))

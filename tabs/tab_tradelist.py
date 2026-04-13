@@ -16,7 +16,8 @@ from pathlib import Path
 
 
 from engines.engine_tradelist import TradelistEngine
-
+from utils.paths import output_root
+from utils.theme import apply_theme
 
 class TabTradelist(QWidget):
     def __init__(self, app_state):
@@ -30,44 +31,75 @@ class TabTradelist(QWidget):
     # UI
     # --------------------------------------------------------
     def _build_ui(self):
-        layout = QVBoxLayout(self)
+        apply_theme(self)
 
-        title = QLabel("Suzuki Parts – Tradelist Maker")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 22px; font-weight: bold;")
-        layout.addWidget(title)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
+        # =========================
+        # TITEL
+        # =========================
+        title = QLabel("Tradelist Maker")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        root.addWidget(title)
+
+        # =========================
+        # UITLEG
+        # =========================
         uitleg = QLabel(
-            "Genereer tradelists voor uw leveranciers op basis van de centrale "
-            "WooCommerce-export.\n\n"
-            "De gegenereerde bestanden worden opgeslagen in de map 'output/tradelists'."
+            "Genereer tradelists voor leveranciers op basis van de geladen "
+            "WooCommerce export.\n\n"
+            "① Controleer of de juiste WC export geladen is\n"
+            "② Start genereren\n"
+            "③ Open de output map voor de bestanden"
         )
         uitleg.setWordWrap(True)
-        uitleg.setAlignment(Qt.AlignCenter)
-        layout.addWidget(uitleg)
+        root.addWidget(uitleg)
 
+        # =========================
+        # STATUS BLOK
+        # =========================
         self.lbl_wc = QLabel("")
-        self.lbl_wc.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.lbl_wc)
+        self.lbl_wc.setWordWrap(True)
+        self.lbl_wc.setStyleSheet("""
+            QLabel {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        root.addWidget(self.lbl_wc)
         self._update_wc_label()
-        self.log = QTextEdit()
-        self.log.setReadOnly(True)
-        layout.addWidget(self.log)
 
-        # Buttons (rechtsonder)
-        btn_open_output = QPushButton("Open output folder")
-        btn_open_output.setFixedHeight(40)
-        btn_open_output.clicked.connect(self.open_output_folder)
+        # =========================
+        # ACTIES
+        # =========================
+        row_actions = QHBoxLayout()
 
-        btn_run = QPushButton("Genereer Tradelist")
-        btn_run.setFixedHeight(40)
+        btn_run = QPushButton("Genereer tradelist")
+        btn_run.setObjectName("primary")
+        btn_run.setMinimumHeight(40)
         btn_run.clicked.connect(self.run_tradelist)
 
-        bottom = QHBoxLayout()
-        bottom.addStretch()
-        bottom.addWidget(btn_open_output)
-        bottom.addWidget(btn_run)
-        layout.addLayout(bottom)
+        btn_open_output = QPushButton("Open output folder")
+        btn_open_output.setObjectName("secondary")
+        btn_open_output.clicked.connect(self.open_output_folder)
+
+        row_actions.addWidget(btn_run)
+        row_actions.addWidget(btn_open_output)
+        row_actions.addStretch()
+
+        root.addLayout(row_actions)
+
+        # =========================
+        # LOG
+        # =========================
+        self.log = QTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setPlaceholderText("Log verschijnt hier...")
+        root.addWidget(self.log, stretch=1)
     # --------------------------------------------------------
     # Helpers
     # --------------------------------------------------------
@@ -81,7 +113,7 @@ class TabTradelist(QWidget):
     def open_output_folder(self):
         """Open de tradelist output map in de file explorer."""
         # Engine default is output/tradelist
-        output_dir = Path("output") / "tradelist"
+        output_dir = output_root() / "tradelist"
 
         # Als we al resultaten hebben in de log, probeer laatste pad te pakken
         # (niet verplicht, maar handig als je ooit met een andere output_dir draait)

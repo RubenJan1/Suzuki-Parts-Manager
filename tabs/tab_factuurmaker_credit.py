@@ -6,80 +6,8 @@ from PySide6.QtWidgets import (
 import os
 import pandas as pd
 from engines.engine_factuurmaker import FactuurMakerEngine
-
-
-# =====================================================
-# DARK UI – ergonomisch & consistent
-# =====================================================
-
-DARK_STYLE = """
-QWidget {
-    background-color: #1E1E1E;
-    color: #E5E7EB;
-    font-size: 11pt;
-}
-
-QLabel {
-    color: #E5E7EB;
-}
-
-/* Inputvelden */
-QLineEdit, QTextEdit, QDoubleSpinBox, QComboBox, QRadioButton, QButtonGroup {
-    background-color: #2A2A2A;
-    color: #F9FAFB;
-    border: 1px solid #3F3F46;
-    padding: 6px;
-}
-
-QLineEdit:focus, QTextEdit:focus, QDoubleSpinBox:focus {
-    border: 1px solid #2563EB;
-}
-
-/* Tabel */
-QTableWidget {
-    background-color: #1F2933;
-    color: #F9FAFB;
-    gridline-color: #374151;
-}
-
-QHeaderView::section {
-    background-color: #111827;
-    color: #F9FAFB;
-    font-weight: bold;
-    padding: 6px;
-    border: 1px solid #374151;
-}
-
-QTableWidget::item:selected {
-    background-color: #2563EB;
-}
-
-/* Knoppen */
-QPushButton {
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-size: 11pt;
-}
-
-QPushButton#primary {
-    background-color: #2563EB;
-    color: white;
-}
-
-QPushButton#primary:hover {
-    background-color: #1D4ED8;
-}
-
-QPushButton#secondary {
-    background-color: #374151;
-    color: white;
-}
-
-QPushButton#danger {
-    background-color: #B91C1C;
-    color: white;
-}
-"""
+from utils.paths import output_root
+from utils.theme import apply_theme
 
 
 def currency(value):
@@ -108,7 +36,7 @@ class TabFactuurmaker(QWidget):
 
     def _build_ui(self):
         # Gebruik systeemtheme (dark/light) automatisch
-
+        apply_theme(self)
         main = QVBoxLayout(self)
         main.setSpacing(18)
         main.setContentsMargins(16, 16, 16, 16)
@@ -390,9 +318,9 @@ class TabFactuurmaker(QWidget):
         )
 
     def on_open_output(self):
-        folder = os.path.abspath("output/facturen")
-        os.makedirs(folder, exist_ok=True)
-        os.startfile(folder)
+        folder = output_root() / "facturen"
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))
 
 
     def on_search_changed(self, text: str):

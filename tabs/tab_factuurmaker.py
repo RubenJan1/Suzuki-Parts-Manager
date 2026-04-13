@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
 )
 
 from engines.engine_factuurmaker import FactuurMakerEngine
-
+from utils.paths import output_root
+from utils.theme import apply_theme
 
 def currency(value) -> str:
     """Format euro with European separators."""
@@ -23,237 +24,6 @@ def currency(value) -> str:
     except Exception:
         return "€ 0,00"
 
-def _is_dark_mode(widget: QWidget) -> bool:
-    bg = widget.palette().color(QPalette.Window)
-    return bg.lightness() < 128
-
-
-def _apply_theme(widget: QWidget) -> None:
-    """
-    Clean professional business/ERP theme:
-    - Compact sizing (better for 14–15,6")
-    - Clear selection states
-    - Subtle borders, less rounding
-    - Buttons not oversized
-    """
-    dark = _is_dark_mode(widget)
-
-    if dark:
-        style = """
-        /* ===== Base ===== */
-        QWidget {
-            background-color: #111827;
-            color: #E5E7EB;
-            font-size: 10pt;
-        }
-        QLabel { color: #E5E7EB; }
-
-        /* ===== Inputs ===== */
-        QLineEdit, QTextEdit, QDoubleSpinBox, QComboBox {
-            background-color: #0B1220;
-            color: #E5E7EB;
-            border: 1px solid #273244;
-            padding: 6px 8px;
-            border-radius: 4px;
-        }
-        QLineEdit:focus, QTextEdit:focus, QDoubleSpinBox:focus, QComboBox:focus {
-            border: 1px solid #60A5FA;
-        }
-
-        /* ===== Buttons ===== */
-        QPushButton {
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 10pt;
-            min-height: 32px;
-            border: 1px solid transparent;
-        }
-        QPushButton#primary {
-            background-color: #2563EB;
-            color: #FFFFFF;
-        }
-        QPushButton#primary:hover { background-color: #1D4ED8; }
-        QPushButton#secondary {
-            background-color: #1F2937;
-            color: #E5E7EB;
-            border: 1px solid #273244;
-        }
-        QPushButton#secondary:hover { background-color: #243244; }
-        QPushButton#danger {
-            background-color: #DC2626;
-            color: #FFFFFF;
-        }
-        QPushButton#danger:hover { background-color: #B91C1C; }
-
-        /* ===== Radio buttons (clean, not pill) ===== */
-        QRadioButton {
-            spacing: 8px;
-            padding: 2px 4px;
-            font-weight: 500;
-        }
-        QRadioButton::indicator {
-            width: 16px;
-            height: 16px;
-        }
-        QRadioButton::indicator:unchecked {
-            border: 1px solid #3B4A63;
-            border-radius: 8px;
-            background: #0B1220;
-        }
-        QRadioButton::indicator:checked {
-            border: 1px solid #2563EB;
-            border-radius: 8px;
-            background: #2563EB;
-        }
-
-        /* ===== Table ===== */
-        QTableWidget {
-            background-color: #0B1220;
-            alternate-background-color: #0E172A;
-            color: #E5E7EB;
-            border: 1px solid #273244;
-            border-radius: 6px;
-            gridline-color: #1F2A3A;
-        }
-        QHeaderView::section {
-            background-color: #0E172A;
-            color: #E5E7EB;
-            font-weight: 600;
-            padding: 7px 8px;
-            border: 0px;
-            border-bottom: 1px solid #273244;
-        }
-        QTableWidget::item {
-            padding-left: 6px;
-            padding-right: 6px;
-        }
-        QTableWidget::item:selected {
-            background-color: #1D4ED8;
-            color: #FFFFFF;
-        }
-
-        /* ===== Scrollbars ===== */
-        QScrollBar:vertical { width: 12px; background: #0B1220; }
-        QScrollBar::handle:vertical { background: #273244; border-radius: 6px; min-height: 28px; }
-        QScrollBar::handle:vertical:hover { background: #334155; }
-        QScrollBar:horizontal { height: 12px; background: #0B1220; }
-        QScrollBar::handle:horizontal { background: #273244; border-radius: 6px; min-width: 28px; }
-        QScrollBar::handle:horizontal:hover { background: #334155; }
-
-        /* ===== Splitter handle ===== */
-        QSplitter::handle {
-            background: #273244;
-        }
-        """
-    else:
-        style = """
-        /* ===== Base ===== */
-        QWidget {
-            background-color: #F3F4F6;
-            color: #111827;
-            font-size: 10pt;
-        }
-        QLabel { color: #111827; }
-
-        /* ===== Inputs ===== */
-        QLineEdit, QTextEdit, QDoubleSpinBox, QComboBox {
-            background-color: #FFFFFF;
-            color: #111827;
-            border: 1px solid #D1D5DB;
-            padding: 6px 8px;
-            border-radius: 4px;
-        }
-        QLineEdit:focus, QTextEdit:focus, QDoubleSpinBox:focus, QComboBox:focus {
-            border: 1px solid #2563EB;
-        }
-
-        /* ===== Buttons ===== */
-        QPushButton {
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 10pt;
-            min-height: 32px;
-            border: 1px solid transparent;
-        }
-        QPushButton#primary {
-            background-color: #2563EB;
-            color: #FFFFFF;
-        }
-        QPushButton#primary:hover { background-color: #1D4ED8; }
-        QPushButton#secondary {
-            background-color: #FFFFFF;
-            color: #111827;
-            border: 1px solid #D1D5DB;
-        }
-        QPushButton#secondary:hover { background-color: #F3F4F6; }
-        QPushButton#danger {
-            background-color: #DC2626;
-            color: #FFFFFF;
-        }
-        QPushButton#danger:hover { background-color: #B91C1C; }
-
-        /* ===== Radio buttons (clean, not pill) ===== */
-        QRadioButton {
-            spacing: 8px;
-            padding: 2px 4px;
-            font-weight: 500;
-        }
-        QRadioButton::indicator {
-            width: 16px;
-            height: 16px;
-        }
-        QRadioButton::indicator:unchecked {
-            border: 1px solid #9CA3AF;
-            border-radius: 8px;
-            background: #FFFFFF;
-        }
-        QRadioButton::indicator:checked {
-            border: 1px solid #2563EB;
-            border-radius: 8px;
-            background: #2563EB;
-        }
-
-        /* ===== Table ===== */
-        QTableWidget {
-            background-color: #FFFFFF;
-            alternate-background-color: #F9FAFB;
-            color: #111827;
-            border: 1px solid #E5E7EB;
-            border-radius: 6px;
-            gridline-color: #EDEDED;
-        }
-        QHeaderView::section {
-            background-color: #F9FAFB;
-            color: #111827;
-            font-weight: 600;
-            padding: 7px 8px;
-            border: 0px;
-            border-bottom: 1px solid #E5E7EB;
-        }
-        QTableWidget::item {
-            padding-left: 6px;
-            padding-right: 6px;
-        }
-        QTableWidget::item:selected {
-            background-color: #DBEAFE;
-            color: #111827;
-        }
-
-        /* ===== Scrollbars ===== */
-        QScrollBar:vertical { width: 12px; background: #F3F4F6; }
-        QScrollBar::handle:vertical { background: #D1D5DB; border-radius: 6px; min-height: 28px; }
-        QScrollBar::handle:vertical:hover { background: #9CA3AF; }
-        QScrollBar:horizontal { height: 12px; background: #F3F4F6; }
-        QScrollBar::handle:horizontal { background: #D1D5DB; border-radius: 6px; min-width: 28px; }
-        QScrollBar::handle:horizontal:hover { background: #9CA3AF; }
-
-        /* ===== Splitter handle ===== */
-        QSplitter::handle {
-            background: #E5E7EB;
-        }
-        """
-
-    widget.setStyleSheet(style)
 
 
 class TabFactuurmaker(QWidget):
@@ -274,30 +44,55 @@ class TabFactuurmaker(QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        _apply_theme(self)
+        apply_theme(self)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
 
+        # =========================
+        # TITEL
+        # =========================
+        title = QLabel("Factuurmaker")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        root.addWidget(title)
+
+        # =========================
+        # UITLEG
+        # =========================
+        uitleg = QLabel(
+            "Maak facturen of creditfacturen op basis van CMS-bestellingen.\n\n"
+            "① Voeg één of meer CMS-bestanden toe\n"
+            "② Controleer documentgegevens\n"
+            "③ Controleer preview\n"
+            "④ Genereer PDF"
+        )
+        uitleg.setWordWrap(True)
+        root.addWidget(uitleg)
+
+        # =========================
+        # HOOFDWERKGEBIED
+        # =========================
         splitter = QSplitter(Qt.Vertical)
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(10)
-        root.addWidget(splitter)
+        root.addWidget(splitter, stretch=1)
 
         # =========================
-        # TOP: Orders + Details + Type/Actions
+        # TOP: BESTANDEN + GEGEVENS + ACTIES
         # =========================
         top = QWidget()
         top_l = QVBoxLayout(top)
         top_l.setSpacing(10)
-        top_l.setContentsMargins(4, 4, 4, 4)
+        top_l.setContentsMargins(0, 0, 0, 0)
 
-        # STEP 1
-        lbl_step1 = QLabel("① CMS orders")
-        lbl_step1.setStyleSheet("font-size: 12.5pt; font-weight: bold;")
+        # CMS bestanden
+        lbl_step1 = QLabel("CMS orders")
+        lbl_step1.setStyleSheet("font-size: 14px; font-weight: bold;")
         top_l.addWidget(lbl_step1)
 
         row_files = QHBoxLayout()
+
         btn_add = QPushButton("Add CMS orders (.xlsx)")
         btn_add.setObjectName("primary")
         btn_add.clicked.connect(self.on_add_files)
@@ -307,22 +102,22 @@ class TabFactuurmaker(QWidget):
         btn_reset.clicked.connect(self.on_reset)
 
         self.lbl_status = QLabel("No CMS orders loaded")
-        self.lbl_status.setStyleSheet("color: #6B7280;")
 
         row_files.addWidget(btn_add)
         row_files.addWidget(btn_reset)
         row_files.addStretch()
         row_files.addWidget(self.lbl_status)
+
         top_l.addLayout(row_files)
 
-        # STEP 2
-        lbl_step2 = QLabel("② Document details")
-        lbl_step2.setStyleSheet("font-size: 12.5pt; font-weight: bold;")
+        # Documentgegevens
+        lbl_step2 = QLabel("Document details")
+        lbl_step2.setStyleSheet("font-size: 14px; font-weight: bold;")
         top_l.addWidget(lbl_step2)
 
         form = QGridLayout()
         form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(6)
+        form.setVerticalSpacing(8)
 
         self.txt_invoice = QLineEdit(self.engine.invoice_number)
         self.txt_invoice.setPlaceholderText("Leeg laten voor automatisch nummer")
@@ -339,7 +134,7 @@ class TabFactuurmaker(QWidget):
         self.txt_billto = QLineEdit(self.engine.bill_to)
 
         self.txt_address = QTextEdit()
-        self.txt_address.setPlainText(self.engine.billing_address)  # ensures real multiline
+        self.txt_address.setPlainText(self.engine.billing_address)
         self.txt_address.setFixedHeight(72)
 
         form.addWidget(QLabel("Documentnummer"), 0, 0)
@@ -359,7 +154,11 @@ class TabFactuurmaker(QWidget):
 
         top_l.addLayout(form)
 
-        # Type + Actions in one row (less wasted space)
+        # Type + acties
+        lbl_step3 = QLabel("Type en acties")
+        lbl_step3.setStyleSheet("font-size: 14px; font-weight: bold;")
+        top_l.addWidget(lbl_step3)
+
         row_type_actions = QHBoxLayout()
         row_type_actions.setSpacing(10)
 
@@ -381,7 +180,6 @@ class TabFactuurmaker(QWidget):
         self.cmb_credit_reason = QComboBox()
         self.cmb_credit_reason.addItems(["Retour", "Te veel gefactureerd", "Verkeerd artikel", "Niet geleverd", "Overig"])
 
-        # Left side: type toggles + credit fields (stacked compact)
         left = QVBoxLayout()
         left.setSpacing(6)
 
@@ -405,7 +203,6 @@ class TabFactuurmaker(QWidget):
         left_wrap = QWidget()
         left_wrap.setLayout(left)
 
-        # Right side: actions
         actions = QHBoxLayout()
         actions.setSpacing(10)
 
@@ -432,16 +229,16 @@ class TabFactuurmaker(QWidget):
         splitter.addWidget(top)
 
         # =========================
-        # BOTTOM: Preview
+        # BOTTOM: PREVIEW
         # =========================
         bottom = QWidget()
         bottom_l = QVBoxLayout(bottom)
         bottom_l.setSpacing(8)
-        bottom_l.setContentsMargins(4, 4, 4, 4)
+        bottom_l.setContentsMargins(0, 0, 0, 0)
 
-        lbl_step3 = QLabel("③ Preview (sleep de scheidslijn om groter te maken)")
-        lbl_step3.setStyleSheet("font-size: 12.5pt; font-weight: bold;")
-        bottom_l.addWidget(lbl_step3)
+        lbl_preview = QLabel("Preview")
+        lbl_preview.setStyleSheet("font-size: 14px; font-weight: bold;")
+        bottom_l.addWidget(lbl_preview)
 
         self.txt_search = QLineEdit()
         self.txt_search.setPlaceholderText("Search part number...")
@@ -454,25 +251,23 @@ class TabFactuurmaker(QWidget):
         self.table.itemChanged.connect(self.on_table_edited)
         self.table.setHorizontalHeaderLabels(["Part Number", "Description", "Qty", "Price", "Total"])
         self.table.setAlternatingRowColors(True)
-
-        # Better scrolling on small screens
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
         self.table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
         self.table.verticalHeader().setDefaultSectionSize(28)
 
-        # Smarter column widths (reduce horizontal scroll)
         hdr = self.table.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Part
-        hdr.setSectionResizeMode(1, QHeaderView.Stretch)           # Description
-        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Qty
-        hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Price
-        hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Total
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)
 
         bottom_l.addWidget(self.table, stretch=1)
 
         row_edit = QHBoxLayout()
+
         btn_add_row = QPushButton("Add manual item")
         btn_add_row.setObjectName("secondary")
         btn_add_row.clicked.connect(self.on_add_row)
@@ -484,17 +279,16 @@ class TabFactuurmaker(QWidget):
         row_edit.addWidget(btn_add_row)
         row_edit.addWidget(btn_remove)
         row_edit.addStretch()
+
         bottom_l.addLayout(row_edit)
 
         splitter.addWidget(bottom)
 
-        # Preview first: make bottom larger by default
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([240, 780])
+        splitter.setSizes([260, 740])
 
         self.on_doc_type_changed()
-
     # =====================================================
     # LOGIC
     # =====================================================
@@ -607,9 +401,9 @@ class TabFactuurmaker(QWidget):
         QMessageBox.information(self, "Document created", f"PDF generated:\n{path}")
 
     def on_open_output(self):
-        folder = os.path.abspath("output/facturen")
-        os.makedirs(folder, exist_ok=True)
-        os.startfile(folder)
+        folder = output_root() / "facturen"
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))
 
     def on_search_changed(self, text: str):
         q = (text or "").strip().lower()
