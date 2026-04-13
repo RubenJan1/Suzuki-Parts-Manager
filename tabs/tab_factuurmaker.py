@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from engines.engine_factuurmaker import FactuurMakerEngine
-
+from utils.paths import output_root
 
 def currency(value) -> str:
     """Format euro with European separators."""
@@ -607,9 +607,9 @@ class TabFactuurmaker(QWidget):
         QMessageBox.information(self, "Document created", f"PDF generated:\n{path}")
 
     def on_open_output(self):
-        folder = os.path.abspath("output/facturen")
-        os.makedirs(folder, exist_ok=True)
-        os.startfile(folder)
+        folder = output_root() / "facturen"
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))
 
     def on_search_changed(self, text: str):
         q = (text or "").strip().lower()

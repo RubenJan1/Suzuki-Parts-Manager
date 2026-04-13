@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 from engines.engine_tradelist import TradelistEngine
-
+from utils.paths import output_root
 
 class TabTradelist(QWidget):
     def __init__(self, app_state):
@@ -81,7 +81,7 @@ class TabTradelist(QWidget):
     def open_output_folder(self):
         """Open de tradelist output map in de file explorer."""
         # Engine default is output/tradelist
-        output_dir = Path("output") / "tradelist"
+        output_dir = output_root() / "tradelist"
 
         # Als we al resultaten hebben in de log, probeer laatste pad te pakken
         # (niet verplicht, maar handig als je ooit met een andere output_dir draait)

@@ -32,13 +32,13 @@ from PySide6.QtWidgets import (
 )
 
 from engines.engine_zoeklijst import EngineZoeklijst, extract_part_numbers_from_text, extract_part_numbers_from_xlsx
-
+from utils.paths import output_root
 
 class TabZoeklijst(QWidget):
     def __init__(self, app_state, parent=None):
         super().__init__(parent)
         self.app_state = app_state
-        self.engine = EngineZoeklijst(output_dir="output/zoeklijst")
+        self.engine = EngineZoeklijst(output_dir=str(output_root() / "zoeklijst"))
         self._last_output_path: Optional[Path] = None
         self._parts: List[str] = []
 
@@ -108,7 +108,7 @@ class TabZoeklijst(QWidget):
         )
 
         # auto-load TLC uit vaste map (hufterproof)
-        tlc_path = os.path.abspath(os.path.join("output", "1322", "TLC", "TLC_1.xlsx"))
+        tlc_path = str(output_root() / "1322" / "TLC" / "TLC_1.xlsx")
         if os.path.exists(tlc_path):
             try:
                 self.engine.load_tlc_xlsx(tlc_path)

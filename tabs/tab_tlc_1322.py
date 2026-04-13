@@ -235,6 +235,6 @@ class TabTLC1322(QWidget):
         self._sync_labels()
 
     def on_open_output(self):
-        folder = os.path.abspath(os.path.join("output", "1322"))
-        os.makedirs(folder, exist_ok=True)
-        os.startfile(folder)
+        folder = output_root() / "1322"
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))

@@ -22,7 +22,7 @@ from services.batch_merge_277 import (
     build_update_from_changes,
     save_merged_files,
 )
-
+from utils.paths import output_root
 class TabWebsite277(QWidget):
     def __init__(self, app_state):
         super().__init__()
@@ -373,6 +373,6 @@ class TabWebsite277(QWidget):
         self._update_batch_status()
 
     def on_open_output(self):
-        folder = os.path.abspath(os.path.join("output", "277"))
-        os.makedirs(folder, exist_ok=True)
-        os.startfile(folder)
+        folder = output_root() / "277"
+        folder.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(folder))
