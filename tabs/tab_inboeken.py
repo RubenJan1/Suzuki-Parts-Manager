@@ -45,8 +45,8 @@ class ChooseHitDialog(QDialog):
 
         self.current_wc_id: Optional[str] = None  # gevuld als je een product uit WC export laadt
         self._force_new: bool = False
-
-
+        self._editing_product_id: Optional[str] = None
+       
         lay = QVBoxLayout(self)
 
         info = QLabel("Dubbelklik of selecteer een regel en klik 'Kies'.")
@@ -111,7 +111,7 @@ class TabInboeken(QWidget):
         self.current_wc_id: Optional[str] = None
         self._force_new: bool = False
         self.selected_hit = None
-
+        self._editing_product_id: Optional[str] = None
 
         if getattr(self.app_state, "wc_df", None) is not None:
             self.engine.set_website_df(self.app_state.wc_df)
@@ -123,6 +123,14 @@ class TabInboeken(QWidget):
         self._build_ui()
         self._install_solid_context_menus()
         self._refresh_validation()
+
+    def _clean_text(self, value) -> str:
+        if value is None:
+            return ""
+        text = str(value).strip()
+        if text.lower() in ("nan", "none", "null"):
+            return ""
+        return text
 
     # ---------------- UI ----------------
 
@@ -227,10 +235,9 @@ class TabInboeken(QWidget):
         sbl = QVBoxLayout(gb_search)
 
         r2 = QHBoxLayout()
-        r2.addWidget(QLabel("Zoeken/Laden:"))
-
+        r2.addWidget(QLabel("Zoeken op alles:"))
         self.ed_quicksearch = QLineEdit()
-        self.ed_quicksearch.setPlaceholderText("Zoek op nummer of tekst (titel/korte beschrijving)")
+        self.ed_quicksearch.setPlaceholderText("Zoek op nummer, titel, beschrijving of locatie")
         self.ed_quicksearch.returnPressed.connect(self.do_quicksearch)
         r2.addWidget(self.ed_quicksearch)
 
@@ -285,6 +292,23 @@ class TabInboeken(QWidget):
         # -------------------------
         # Productgegevens
         # -------------------------
+
+        gb_search = QGroupBox("Zoeken / Laden")
+        sbl = QVBoxLayout(gb_search)
+
+        r2 = QHBoxLayout()
+        r2.addWidget(QLabel("Zoeken op alles:"))
+        self.ed_quicksearch = QLineEdit()
+        self.ed_quicksearch.setPlaceholderText("Zoek op nummer, titel, beschrijving of locatie")
+        self.ed_quicksearch.returnPressed.connect(self.do_quicksearch)
+        r2.addWidget(self.ed_quicksearch)
+        btn2 = QPushButton("Popup")
+        btn2.clicked.connect(self.do_quicksearch)
+        r2.addWidget(btn2)
+        sbl.addLayout(r2)
+
+        rl.addWidget(gb_search)
+
         gb_data = QGroupBox("Productgegevens")
         dbl = QVBoxLayout(gb_data)
 
@@ -432,7 +456,11 @@ class TabInboeken(QWidget):
         # Verhoudingen: links voldoende ruimte voor zoeken + categorieën
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
-        splitter.setSizes([420, 760])
+
+        self.btn_save.setObjectName("primary")
+        btn_clear.setObjectName("secondary")
+        btn_save_out.setObjectName("secondary")
+        btn_open_out.setObjectName("secondary")
 
         self._build_tree_from_json(CATEGORIES_TREE)
         self._update_selected_label()
@@ -746,6 +774,7 @@ class TabInboeken(QWidget):
         return None
 
     def do_search_title(self):
+        self._force_new = False
         q = (self.ed_title.text() or "").strip()
         if not q:
             return
@@ -764,6 +793,7 @@ class TabInboeken(QWidget):
             self._apply_hit(chosen)
 
     def do_quicksearch(self):
+        self._force_new = False
         q = (self.ed_quicksearch.text() or "").strip()
         if not q:
             return
@@ -778,22 +808,28 @@ class TabInboeken(QWidget):
 
     def _apply_hit(self, hit: SearchHit):
         data = self.engine.load_product(hit)
-        # onthoud WC ID (waterproof update)
+
         self._force_new = False
         self.current_wc_id = None
+        self._editing_product_id = None
+
         try:
             if hit.row is not None:
-                self.current_wc_id = str(hit.row.get("ID", "")).strip() or None
+                found_id = str(hit.row.get("ID", "")).strip() or None
+                self.current_wc_id = found_id
+                self._editing_product_id = found_id
         except Exception:
             self.current_wc_id = None
+            self._editing_product_id = None
 
-        self.ed_title.setText(data.get("Title", ""))
-        self.ed_stock.setText(data.get("Stock", ""))
-        self.ed_price.setText(data.get("Prijs", ""))
-        self.ed_location.setText(data.get("Locatie", ""))
-        self.ed_desc.setPlainText(data.get("Short Description", "") or "")
+        self.ed_title.setText(self._clean_text(data.get("Title", "")))
+        self.ed_stock.setText(self._clean_text(data.get("Stock", "")))
+        self.ed_price.setText(self._clean_text(data.get("Prijs", "")))
+        self.ed_location.setText(self._clean_text(data.get("Locatie", "")))
+        self.ed_desc.setPlainText(self._clean_text(data.get("Short Description", "")))
 
-        # merge categorieën (nooit overschrijven)
+        self.selected_category_paths.clear()
+
         for p in data.get("SelectedCategoryPaths", []) or []:
             if p:
                 self.selected_category_paths.add(p)
@@ -806,13 +842,14 @@ class TabInboeken(QWidget):
     # ------------- Save -------------
 
     def on_add_update(self):
+        wc_id_to_use = None if self._force_new else self.current_wc_id
         title = (self.ed_title.text() or "").strip()
         stock = (self.ed_stock.text() or "").strip()
         prijs = (self.ed_price.text() or "").strip()
         locatie = (self.ed_location.text() or "").strip()
         short_desc = (self.ed_desc.toPlainText() or "").strip()
         cats = sorted(self.selected_category_paths)
-
+        
         # uitverkocht confirm
         try:
             s_int = int(float(stock.replace(",", "."))) if stock else 0
@@ -832,6 +869,8 @@ class TabInboeken(QWidget):
 
         # ✅ engine call + debug bij crash
         try:
+            wc_id_to_use = None if self._force_new else self.current_wc_id
+
             res = self.engine.add_or_update(
                 title=title,
                 selected_category_paths=cats,
@@ -839,7 +878,7 @@ class TabInboeken(QWidget):
                 short_description=short_desc,
                 locatie=locatie,
                 prijs=prijs,
-                wc_id=self.current_wc_id,
+                wc_id=wc_id_to_use,
             )
         except Exception as e:
             # debug log (mag nooit extra crashen)
@@ -864,6 +903,7 @@ class TabInboeken(QWidget):
         self.current_wc_id = None
         self._force_new = False
         self.selected_hit = None
+        self._editing_product_id = None
         self.on_clear()
 
         self._refresh_validation()
@@ -877,6 +917,8 @@ class TabInboeken(QWidget):
             (self.ed_desc.toPlainText() or "").strip(),
             bool(self.selected_category_paths),
             (self.zedder_text.toPlainText() or "").strip(),
+            (self.ed_quicksearch.text() or "").strip(),
+            (self.ed_cat_filter.text() or "").strip(),
         ])
 
         if has_data:
@@ -892,19 +934,25 @@ class TabInboeken(QWidget):
         self.current_wc_id = None
         self._force_new = False
         self.selected_hit = None
+        self._editing_product_id = None
 
         self.ed_title.clear()
         self.ed_stock.clear()
         self.ed_price.clear()
-        self.zedder_text.clear()
         self.ed_location.clear()
         self.ed_desc.clear()
-        self._editing_product_id = None
+        self.ed_quicksearch.clear()
+        self.ed_cat_filter.clear()
+        self.zedder_text.clear()
+
         self.selected_category_paths.clear()
         self._sync_tree_checks()
+        self._apply_tree_filter("")
         self._update_selected_label()
+
         self._refresh_validation()
         self._log("Formulier leeggemaakt: nieuwe invoer gestart.")
+        self.lbl_status.setText("Geen product geladen")
     
 
     def _parse_price_from_ui(self, s: str) -> float:
