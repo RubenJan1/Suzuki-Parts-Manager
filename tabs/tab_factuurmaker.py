@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import os
 import pandas as pd
-
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QFileDialog, QMessageBox, QTableWidget, QTableWidgetItem,
-    QLineEdit, QTextEdit, QDoubleSpinBox, QComboBox, QRadioButton, QButtonGroup,
-    QSplitter, QSizePolicy, QHeaderView
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QPushButton, QLabel, QLineEdit, QTextEdit,
+    QRadioButton, QComboBox, QDoubleSpinBox,
+    QTableWidget, QHeaderView, QSizePolicy,
+    QGroupBox, QButtonGroup, QTableWidgetItem, QMessageBox, QFileDialog
 )
 
 from engines.engine_factuurmaker import FactuurMakerEngine
@@ -42,6 +42,7 @@ class TabFactuurmaker(QWidget):
         self.app_state = app_state
         self.engine = FactuurMakerEngine()
         self._build_ui()
+        self._validate_form()
 
     def _build_ui(self):
         apply_theme(self)
@@ -58,38 +59,62 @@ class TabFactuurmaker(QWidget):
         root.addWidget(title)
 
         # =========================
-        # UITLEG
+        # TYPE EERST KIEZEN
         # =========================
-        uitleg = QLabel(
-            "Maak facturen of creditfacturen op basis van CMS-bestellingen.\n\n"
-            "① Voeg één of meer CMS-bestanden toe\n"
-            "② Controleer documentgegevens\n"
-            "③ Controleer preview\n"
-            "④ Genereer PDF"
-        )
-        uitleg.setWordWrap(True)
-        root.addWidget(uitleg)
+        box_type = QGroupBox("1. Documenttype")
+        box_type_l = QVBoxLayout(box_type)
+
+        row_type = QHBoxLayout()
+        row_type.addWidget(QLabel("Kies documenttype:"))
+
+        self.rb_invoice = QRadioButton("Factuur")
+        self.rb_credit = QRadioButton("Creditfactuur")
+        self.rb_invoice.setChecked(True)
+
+        self.doc_group = QButtonGroup(self)
+        self.doc_group.addButton(self.rb_invoice)
+        self.doc_group.addButton(self.rb_credit)
+
+        self.rb_invoice.toggled.connect(self.on_doc_type_changed)
+        self.rb_credit.toggled.connect(self.on_doc_type_changed)
+
+        row_type.addWidget(self.rb_invoice)
+        row_type.addWidget(self.rb_credit)
+        row_type.addStretch()
+
+        box_type_l.addLayout(row_type)
+
+        row_credit = QGridLayout()
+        row_credit.setHorizontalSpacing(12)
+        row_credit.setVerticalSpacing(6)
+
+        self.lbl_original_invoice = QLabel("Originele factuur")
+        self.txt_original_invoice = QLineEdit()
+        self.txt_original_invoice.setPlaceholderText("Verplicht bij creditfactuur")
+
+        self.lbl_credit_reason = QLabel("Reden")
+        self.cmb_credit_reason = QComboBox()
+        self.cmb_credit_reason.addItems([
+            "Retour",
+            "Te veel gefactureerd",
+            "Verkeerd artikel",
+            "Niet geleverd",
+            "Overig",
+        ])
+
+        row_credit.addWidget(self.lbl_original_invoice, 0, 0)
+        row_credit.addWidget(self.txt_original_invoice, 0, 1)
+        row_credit.addWidget(self.lbl_credit_reason, 0, 2)
+        row_credit.addWidget(self.cmb_credit_reason, 0, 3)
+
+        box_type_l.addLayout(row_credit)
+        root.addWidget(box_type)
 
         # =========================
-        # HOOFDWERKGEBIED
+        # CMS BESTANDEN LADEN
         # =========================
-        splitter = QSplitter(Qt.Vertical)
-        splitter.setChildrenCollapsible(False)
-        splitter.setHandleWidth(10)
-        root.addWidget(splitter, stretch=1)
-
-        # =========================
-        # TOP: BESTANDEN + GEGEVENS + ACTIES
-        # =========================
-        top = QWidget()
-        top_l = QVBoxLayout(top)
-        top_l.setSpacing(10)
-        top_l.setContentsMargins(0, 0, 0, 0)
-
-        # CMS bestanden
-        lbl_step1 = QLabel("CMS orders")
-        lbl_step1.setStyleSheet("font-size: 14px; font-weight: bold;")
-        top_l.addWidget(lbl_step1)
+        box_files = QGroupBox("2. CMS orders laden")
+        box_files_l = QVBoxLayout(box_files)
 
         row_files = QHBoxLayout()
 
@@ -108,12 +133,14 @@ class TabFactuurmaker(QWidget):
         row_files.addStretch()
         row_files.addWidget(self.lbl_status)
 
-        top_l.addLayout(row_files)
+        box_files_l.addLayout(row_files)
+        root.addWidget(box_files)
 
-        # Documentgegevens
-        lbl_step2 = QLabel("Document details")
-        lbl_step2.setStyleSheet("font-size: 14px; font-weight: bold;")
-        top_l.addWidget(lbl_step2)
+        # =========================
+        # KLANT / DOCUMENTGEGEVENS
+        # =========================
+        box_details = QGroupBox("3. Klant- en documentgegevens")
+        box_details_l = QVBoxLayout(box_details)
 
         form = QGridLayout()
         form.setHorizontalSpacing(12)
@@ -130,6 +157,7 @@ class TabFactuurmaker(QWidget):
         self.spin_shipping.setMaximum(9999)
         self.spin_shipping.setSuffix(" €")
         self.spin_shipping.valueChanged.connect(self._update_engine)
+        self.spin_shipping.valueChanged.connect(self._validate_form)
 
         self.txt_billto = QLineEdit(self.engine.bill_to)
 
@@ -139,6 +167,7 @@ class TabFactuurmaker(QWidget):
 
         form.addWidget(QLabel("Documentnummer"), 0, 0)
         form.addWidget(self.txt_invoice, 0, 1)
+        self.txt_original_invoice.textChanged.connect(self._validate_form)
 
         form.addWidget(QLabel("Klant-/CMS nummer"), 0, 2)
         form.addWidget(self.txt_supplier, 0, 3)
@@ -148,102 +177,26 @@ class TabFactuurmaker(QWidget):
 
         form.addWidget(QLabel("Bill to"), 1, 2)
         form.addWidget(self.txt_billto, 1, 3)
+        self.txt_billto.textChanged.connect(self._validate_form)
 
         form.addWidget(QLabel("Billing address"), 2, 0)
         form.addWidget(self.txt_address, 2, 1, 1, 3)
+        self.txt_address.textChanged.connect(self._validate_form)
 
-        top_l.addLayout(form)
-
-        # Type + acties
-        lbl_step3 = QLabel("Type en acties")
-        lbl_step3.setStyleSheet("font-size: 14px; font-weight: bold;")
-        top_l.addWidget(lbl_step3)
-
-        row_type_actions = QHBoxLayout()
-        row_type_actions.setSpacing(10)
-
-        self.rb_invoice = QRadioButton("Factuur")
-        self.rb_credit = QRadioButton("Creditfactuur")
-        self.rb_invoice.setChecked(True)
-
-        self.doc_group = QButtonGroup(self)
-        self.doc_group.addButton(self.rb_invoice)
-        self.doc_group.addButton(self.rb_credit)
-        self.rb_invoice.toggled.connect(self.on_doc_type_changed)
-        self.rb_credit.toggled.connect(self.on_doc_type_changed)
-
-        self.lbl_original_invoice = QLabel("Originele factuur")
-        self.txt_original_invoice = QLineEdit()
-        self.txt_original_invoice.setPlaceholderText("Factuurnummer waar deze credit bij hoort (verplicht)")
-
-        self.lbl_credit_reason = QLabel("Reden")
-        self.cmb_credit_reason = QComboBox()
-        self.cmb_credit_reason.addItems(["Retour", "Te veel gefactureerd", "Verkeerd artikel", "Niet geleverd", "Overig"])
-
-        left = QVBoxLayout()
-        left.setSpacing(6)
-
-        row_type = QHBoxLayout()
-        row_type.addWidget(QLabel("Type"))
-        row_type.addSpacing(8)
-        row_type.addWidget(self.rb_invoice)
-        row_type.addWidget(self.rb_credit)
-        row_type.addStretch()
-        left.addLayout(row_type)
-
-        row_credit = QGridLayout()
-        row_credit.setHorizontalSpacing(12)
-        row_credit.setVerticalSpacing(6)
-        row_credit.addWidget(self.lbl_original_invoice, 0, 0)
-        row_credit.addWidget(self.txt_original_invoice, 0, 1)
-        row_credit.addWidget(self.lbl_credit_reason, 0, 2)
-        row_credit.addWidget(self.cmb_credit_reason, 0, 3)
-        left.addLayout(row_credit)
-
-        left_wrap = QWidget()
-        left_wrap.setLayout(left)
-
-        actions = QHBoxLayout()
-        actions.setSpacing(10)
-
-        self.btn_generate = QPushButton("Generate invoice (PDF)")
-        self.btn_generate.setObjectName("primary")
-        self.btn_generate.clicked.connect(self.on_generate)
-
-        btn_open = QPushButton("Open output folder")
-        btn_open.setObjectName("secondary")
-        btn_open.clicked.connect(self.on_open_output)
-
-        actions.addWidget(self.btn_generate)
-        actions.addWidget(btn_open)
-
-        actions_wrap = QWidget()
-        actions_wrap.setLayout(actions)
-
-        row_type_actions.addWidget(left_wrap, 1)
-        row_type_actions.addStretch()
-        row_type_actions.addWidget(actions_wrap, 0)
-
-        top_l.addLayout(row_type_actions)
-
-        splitter.addWidget(top)
+        box_details_l.addLayout(form)
+        root.addWidget(box_details)
 
         # =========================
-        # BOTTOM: PREVIEW
+        # PREVIEW / REGELS
         # =========================
-        bottom = QWidget()
-        bottom_l = QVBoxLayout(bottom)
-        bottom_l.setSpacing(8)
-        bottom_l.setContentsMargins(0, 0, 0, 0)
-
-        lbl_preview = QLabel("Preview")
-        lbl_preview.setStyleSheet("font-size: 14px; font-weight: bold;")
-        bottom_l.addWidget(lbl_preview)
+        box_preview = QGroupBox("4. Regels controleren en aanpassen")
+        box_preview_l = QVBoxLayout(box_preview)
+        box_preview_l.setSpacing(8)
 
         self.txt_search = QLineEdit()
-        self.txt_search.setPlaceholderText("Search part number...")
+        self.txt_search.setPlaceholderText("Zoek part number in preview...")
         self.txt_search.textChanged.connect(self.on_search_changed)
-        bottom_l.addWidget(self.txt_search)
+        box_preview_l.addWidget(self.txt_search)
 
         self.table = QTableWidget(0, 5)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -264,7 +217,7 @@ class TabFactuurmaker(QWidget):
         hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)
 
-        bottom_l.addWidget(self.table, stretch=1)
+        box_preview_l.addWidget(self.table, stretch=1)
 
         row_edit = QHBoxLayout()
 
@@ -280,18 +233,106 @@ class TabFactuurmaker(QWidget):
         row_edit.addWidget(btn_remove)
         row_edit.addStretch()
 
-        bottom_l.addLayout(row_edit)
+        box_preview_l.addLayout(row_edit)
+        root.addWidget(box_preview, stretch=1)
 
-        splitter.addWidget(bottom)
+        # =========================
+        # GENEREREN
+        # =========================
+        box_actions = QGroupBox("5. Genereren")
+        box_actions_l = QHBoxLayout(box_actions)
+        self.lbl_validation = QLabel("")
+        self.lbl_validation.setWordWrap(True)
+        self.lbl_validation.setStyleSheet("""
+            QLabel {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                padding: 10px;
+                font-weight: bold;
+            }
+        """)
 
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([260, 740])
+        box_actions_l.addWidget(self.lbl_validation)
+
+        self.btn_generate = QPushButton("Generate invoice (PDF)")
+        self.btn_generate.setObjectName("primary")
+        self.btn_generate.setMinimumHeight(40)
+        self.btn_generate.clicked.connect(self.on_generate)
+
+        btn_open = QPushButton("Open output folder")
+        btn_open.setObjectName("secondary")
+        btn_open.clicked.connect(self.on_open_output)
+
+        box_actions_l.addStretch()
+        box_actions_l.addWidget(self.btn_generate)
+        box_actions_l.addWidget(btn_open)
+
+        root.addWidget(box_actions)
 
         self.on_doc_type_changed()
     # =====================================================
     # LOGIC
     # =====================================================
+    def _validate_form(self):
+        errors = []
+
+        # ===== Document type
+        is_credit = self.rb_credit.isChecked()
+
+        # ===== Klantgegevens
+        if not (self.txt_billto.text() or "").strip():
+            errors.append("Geen klant (Bill to) ingevuld")
+
+        if not (self.txt_address.toPlainText() or "").strip():
+            errors.append("Geen adres ingevuld")
+
+        # ===== Credit check
+        if is_credit:
+            if not (self.txt_original_invoice.text() or "").strip():
+                errors.append("Creditfactuur zonder originele factuur")
+
+        # ===== Data check
+        if self.engine.work_df is None or self.engine.work_df.empty:
+            errors.append("Geen regels (producten) geladen")
+
+        # ===== Totaal check (optioneel maar sterk)
+        try:
+            df = self.engine.work_df
+            if df is not None and not df.empty:
+                total = (df["Aantal"] * df["Prijs"]).sum() + self.engine.verzendkosten
+                if abs(total) < 0.01:
+                    errors.append("Totaal is 0.00")
+        except Exception:
+            pass
+
+        # ===== RESULTAAT
+        if errors:
+            self.lbl_validation.setText("❌ Niet klaar:\n- " + "\n- ".join(errors))
+            self.lbl_validation.setStyleSheet("""
+                QLabel {
+                    background: rgba(255, 0, 0, 0.08);
+                    border: 1px solid rgba(255, 0, 0, 0.4);
+                    border-radius: 8px;
+                    padding: 10px;
+                    font-weight: bold;
+                    color: #a00000;
+                }
+            """)
+            self.btn_generate.setEnabled(False)
+        else:
+            self.lbl_validation.setText("✅ Klaar om te genereren")
+            self.lbl_validation.setStyleSheet("""
+                QLabel {
+                    background: rgba(0, 150, 0, 0.08);
+                    border: 1px solid rgba(0, 150, 0, 0.4);
+                    border-radius: 8px;
+                    padding: 10px;
+                    font-weight: bold;
+                    color: #006600;
+                }
+            """)
+            self.btn_generate.setEnabled(True)
 
     def _update_engine(self):
         self.engine.verzendkosten = float(self.spin_shipping.value())
@@ -303,8 +344,9 @@ class TabFactuurmaker(QWidget):
         self.txt_original_invoice.setVisible(is_credit)
         self.lbl_credit_reason.setVisible(is_credit)
         self.cmb_credit_reason.setVisible(is_credit)
-
+        
         self.btn_generate.setText("Generate credit invoice (PDF)" if is_credit else "Generate invoice (PDF)")
+        self._validate_form()
         self.refresh_preview()
 
     def on_add_files(self):
@@ -314,6 +356,7 @@ class TabFactuurmaker(QWidget):
         for p in paths:
             self.engine.add_cms_bestelling(p)
         self.refresh_preview()
+        self._validate_form()
 
     def on_reset(self):
         if QMessageBox.question(self, "Reset", "Remove all CMS orders?") != QMessageBox.Yes:
@@ -323,6 +366,7 @@ class TabFactuurmaker(QWidget):
         self.table.setRowCount(0)
         self.table.blockSignals(False)
         self.lbl_status.setText("No CMS orders loaded")
+        self._validate_form()
 
     def refresh_preview(self):
         df = self.engine.work_df
@@ -434,6 +478,7 @@ class TabFactuurmaker(QWidget):
         self.engine.merge_work_df()
         self.engine.sort_work_df()
         self.refresh_preview()
+        self._validate_form()
 
     def on_remove_row(self):
         row = self.table.currentRow()
@@ -445,12 +490,19 @@ class TabFactuurmaker(QWidget):
         self.engine.merge_work_df()
         self.engine.sort_work_df()
         self.refresh_preview()
+        self._validate_form()
 
     def on_add_row(self):
         if self.engine.work_df is None:
             self.engine.clear_bestellingen()
-        new_row = {"Artikel": "MANUAL", "Omschrijving": "Handmatig toegevoegd", "Aantal": 1, "Prijs": 0.0}
+        new_row = {
+            "Artikel": "",
+            "Omschrijving": "",
+            "Aantal": 1,
+            "Prijs": 0.0
+        }
         self.engine.work_df = pd.concat([self.engine.work_df, pd.DataFrame([new_row])], ignore_index=True)
         self.engine.merge_work_df()
         self.engine.sort_work_df()
         self.refresh_preview()
+        self._validate_form()
