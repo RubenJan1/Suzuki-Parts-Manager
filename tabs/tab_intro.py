@@ -122,11 +122,21 @@ class TabIntro(QWidget):
         # =========================
         # ACTIE
         # =========================
-        self.btn_upload = QPushButton("Upload WooCommerce CSV export")
+        self.btn_upload = QPushButton("Laad WooCommerce export")
         self.btn_upload.setObjectName("primary")
         self.btn_upload.setMinimumHeight(40)
         self.btn_upload.clicked.connect(self.load_wc_export)
         root.addWidget(self.btn_upload)
+
+        # =========================
+        # HERLAAD KNOP
+        # =========================
+        self.btn_reload = QPushButton("Andere export laden")
+        self.btn_reload.setObjectName("secondary")
+        self.btn_reload.setMinimumHeight(40)
+        self.btn_reload.clicked.connect(self.load_wc_export)
+        root.addWidget(self.btn_reload)
+     
 
         # =========================
         # STATUS BLOK

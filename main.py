@@ -150,17 +150,18 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
 
+    # 🔴 EERST: check of app al open is
+    lock = create_single_instance_lock()
+    if lock is None:
+        sys.exit(0)
+
+    # ✅ DAN PAS splash
     splash = create_splash(app)
     splash_message(app, splash, "App starten...")
 
     splash_message(app, splash, "Lokale mappen controleren...")
     appdata_root()
     output_root()
-
-    splash_message(app, splash, "Controleren of de app al geopend is...")
-    lock = create_single_instance_lock()
-    if lock is None:
-        sys.exit(0)
 
     splash_message(app, splash, "Hoofdvenster laden...")
     window = MainWindow()

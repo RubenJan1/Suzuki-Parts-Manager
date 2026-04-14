@@ -79,6 +79,7 @@ class TabFactuurmaker(QWidget):
         self.rb_invoice.toggled.connect(self.on_doc_type_changed)
         self.rb_credit.toggled.connect(self.on_doc_type_changed)
 
+        row_type.setSpacing(12)
         row_type.addWidget(self.rb_invoice)
         row_type.addWidget(self.rb_credit)
         row_type.addStretch()
