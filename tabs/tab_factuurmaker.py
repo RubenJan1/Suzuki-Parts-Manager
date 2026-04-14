@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from engines.engine_factuurmaker import FactuurMakerEngine
 from utils.paths import output_root
 from utils.theme import apply_theme
+from PySide6.QtGui import QColor
 
 def currency(value) -> str:
     """Format euro with European separators."""
@@ -274,6 +275,50 @@ class TabFactuurmaker(QWidget):
     # =====================================================
     # LOGIC
     # =====================================================
+    def _preview_issues(self):
+        errors = []
+        warnings = []
+
+        if self.engine.work_df is None or self.engine.work_df.empty:
+            return errors, warnings
+
+        df = self.engine.work_df
+
+        for idx, row in df.iterrows():
+            artikel = str(row.get("Artikel", "") or "").strip()
+            omschrijving = str(row.get("Omschrijving", "") or "").strip()
+
+            try:
+                aantal = int(float(row.get("Aantal", 0)))
+            except Exception:
+                aantal = 0
+
+            try:
+                prijs = float(row.get("Prijs", 0) or 0)
+            except Exception:
+                prijs = 0.0
+
+            row_no = idx + 1
+
+            # 🔴 FOUTEN
+            if not artikel:
+                errors.append(f"Regel {row_no}: artikelnummer ontbreekt")
+
+            if not omschrijving:
+                errors.append(f"Regel {row_no}: omschrijving ontbreekt")
+
+            if aantal == 0:
+                errors.append(f"Regel {row_no}: aantal is 0")
+
+            # 🟡 WAARSCHUWINGEN
+            if prijs == 0:
+                warnings.append(f"Regel {row_no}: prijs is 0,00")
+
+            if prijs < 0:
+                warnings.append(f"Regel {row_no}: negatieve prijs")
+
+        return errors, warnings
+    
     def _validate_form(self):
         errors = []
 
@@ -295,6 +340,51 @@ class TabFactuurmaker(QWidget):
         # ===== Data check
         if self.engine.work_df is None or self.engine.work_df.empty:
             errors.append("Geen regels (producten) geladen")
+
+        preview_errors, preview_warnings = self._preview_issues()
+
+        if preview_errors:
+            errors.append(f"{len(preview_errors)} foutieve previewregel(s)")
+            errors.extend(preview_errors[:2])
+
+        # warnings alleen tonen, niet blokkeren
+        warning_text = ""
+        if preview_warnings:
+            warning_text = "\n⚠️ Waarschuwingen:\n- " + "\n- ".join(preview_warnings[:2])
+        if errors:
+            self.lbl_validation.setText(
+                "❌ Niet klaar:\n- " + "\n- ".join(errors) + warning_text
+            )
+            self.lbl_validation.setStyleSheet("""
+                QLabel {
+                    background: rgba(255, 0, 0, 0.08);
+                    border: 1px solid rgba(255, 0, 0, 0.4);
+                    border-radius: 8px;
+                    padding: 10px;
+                    font-weight: bold;
+                    color: #a00000;
+                }
+            """)
+            self.btn_generate.setEnabled(False)
+
+        else:
+            text = "✅ Klaar om te genereren"
+            if preview_warnings:
+                text += warning_text
+
+            self.lbl_validation.setText(text)
+
+            self.lbl_validation.setStyleSheet("""
+                QLabel {
+                    background: rgba(0, 150, 0, 0.08);
+                    border: 1px solid rgba(0, 150, 0, 0.4);
+                    border-radius: 8px;
+                    padding: 10px;
+                    font-weight: bold;
+                    color: #006600;
+                }
+            """)
+            self.btn_generate.setEnabled(True)
 
         # ===== Totaal check (optioneel maar sterk)
         try:
@@ -384,15 +474,52 @@ class TabFactuurmaker(QWidget):
             row = self.table.rowCount()
             self.table.insertRow(row)
 
-            qty = int(r["Aantal"]) * sign
-            price = float(r["Prijs"])
+            artikel = str(r.get("Artikel", "") or "").strip()
+            omschrijving = str(r.get("Omschrijving", "") or "").strip()
+
+            try:
+                qty_raw = int(r["Aantal"])
+            except Exception:
+                qty_raw = 0
+
+            try:
+                price = float(r["Prijs"])
+            except Exception:
+                price = 0.0
+
+            qty = qty_raw * sign
             total = qty * price
 
-            self.table.setItem(row, 0, QTableWidgetItem(str(r["Artikel"])))
-            self.table.setItem(row, 1, QTableWidgetItem(str(r["Omschrijving"])))
-            self.table.setItem(row, 2, QTableWidgetItem(str(qty)))
-            self.table.setItem(row, 3, QTableWidgetItem(currency(price)))
-            self.table.setItem(row, 4, QTableWidgetItem(currency(total)))
+            item_artikel = QTableWidgetItem(artikel)
+            item_omschrijving = QTableWidgetItem(omschrijving)
+            item_qty = QTableWidgetItem(str(qty))
+            item_price = QTableWidgetItem(currency(price))
+            item_total = QTableWidgetItem(currency(total))
+            warn_bg = QColor(255, 245, 200)   # geel
+            error_bg = QColor(255, 220, 220)  # licht rood
+
+            # 🔴 fouten
+            if not artikel:
+                item_artikel.setBackground(error_bg)
+
+            if not omschrijving:
+                item_omschrijving.setBackground(error_bg)
+
+            if qty_raw == 0:
+                item_qty.setBackground(error_bg)
+
+            # 🟡 waarschuwingen
+            if price == 0:
+                item_price.setBackground(warn_bg)
+
+            if price < 0:
+                item_price.setBackground(warn_bg)
+
+            self.table.setItem(row, 0, item_artikel)
+            self.table.setItem(row, 1, item_omschrijving)
+            self.table.setItem(row, 2, item_qty)
+            self.table.setItem(row, 3, item_price)
+            self.table.setItem(row, 4, item_total)
 
         self.table.blockSignals(False)
         self.on_search_changed(self.txt_search.text())
