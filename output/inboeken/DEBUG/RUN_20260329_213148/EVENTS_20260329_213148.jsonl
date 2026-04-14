@@ -1,5 +1,0 @@
-{"ts": "2026-03-29T21:31:48", "kind": "ENGINE_START", "output_dir": "C:\\Users\\ruben\\OneDrive\\Documenten\\Werk\\suzuki_app\\output\\inboeken"}
-{"ts": "2026-03-29T21:32:55", "kind": "SAVE_OK", "actie": "Update", "title": "09100-10151", "wc_id": "46337", "stock": 1, "prijs": 2.35, "locatie": "T 125", "categories_count": 2, "categories_export": "T125|T125 Pattern parts", "force_new": false}
-{"ts": "2026-03-29T21:33:09", "kind": "SAVE_OK", "actie": "Nieuw", "title": "nieuw", "wc_id": "", "stock": 1, "prijs": 23223.0, "locatie": "TEST", "categories_count": 1, "categories_export": "T125", "force_new": false}
-{"ts": "2026-03-29T21:33:35", "kind": "SAVE_OK", "actie": "Update", "title": "12221-46000", "wc_id": "50730", "stock": 2, "prijs": 99.0, "locatie": "D102", "categories_count": 1, "categories_export": "RM50 / RM60 / RM80", "force_new": false}
-{"ts": "2026-03-29T21:33:59", "kind": "SAVE_OK", "actie": "Nieuw", "title": "tetst id", "wc_id": "", "stock": 1, "prijs": 23423423.0, "locatie": "TEST ID", "categories_count": 1, "categories_export": "RE-5 Pattern parts", "force_new": false}

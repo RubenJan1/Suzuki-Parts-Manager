@@ -5,6 +5,8 @@
 # Batch-afboeken (alleen voorraad)
 # ============================================================
 
+from os import path
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFileDialog,
@@ -147,6 +149,37 @@ class TabWebsite277(QWidget):
     # --------------------------------------------------------
     # HELPERS
     # --------------------------------------------------------
+    def _find_overlapping_paths_with_batch(self, open_batch: dict):
+        old_paths = {
+            self._normalize_path(p)
+            for p in open_batch.get("cms_paths", [])
+            if str(p).strip()
+        }
+        new_paths = {
+            self._normalize_path(p)
+            for p in self.engine.cms_paths
+            if str(p).strip()
+        }
+        return sorted(old_paths & new_paths)
+    
+    def _normalize_path(self, path: str) -> str:
+        return os.path.normcase(os.path.abspath(str(path or "")))
+    
+    def _dedupe_new_paths(self, paths):
+        existing = {self._normalize_path(p) for p in self.engine.cms_paths}
+        keep = []
+        skipped = []
+
+        for p in paths:
+            np = self._normalize_path(p)
+            if np in existing:
+                skipped.append(p)
+                continue
+            existing.add(np)
+            keep.append(p)
+
+        return keep, skipped
+    
     def _update_wc(self):
         if self.app_state.wc_path and os.path.exists(self.app_state.wc_path):
             mtime = os.path.getmtime(self.app_state.wc_path)
@@ -197,11 +230,21 @@ class TabWebsite277(QWidget):
         # 3) merge changes
         try:
             merged_changes_df = merge_changes(old_df, new_df)
-            merged_update_df = build_update_from_changes(
-                merged_changes_df,
-                self.app_state.wc_df
-            )
-            merged_files = save_merged_files(merged_changes_df, merged_update_df)
+            # 🔥 NIEUW: engine opnieuw laten draaien met gecombineerde input
+
+            # combineer alle cms bestanden van oude + nieuwe batch
+            all_cms_paths = list(set(
+                list(open_batch.get("cms_paths", [])) +
+                list(self.engine.cms_paths)
+            ))
+
+            # reset engine en voeg alles opnieuw toe
+            self.engine.clear()
+            for p in all_cms_paths:
+                self.engine.add_cms_277(p)
+
+            # draai engine opnieuw → maakt ALLES opnieuw
+            merged_result = self.engine.run()
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -213,31 +256,31 @@ class TabWebsite277(QWidget):
         # 4) oude open batch op MERGED zetten
         self.batch_store.mark_merged(
             open_batch["batch_id"],
-            merged_files["batch_id"]
+            merged_result["batch_id"]
         )
 
         # 5) nieuwe gewone batch ook op MERGED zetten
         self.batch_store.create_batch(new_result)
         self.batch_store.mark_merged(
             new_result["batch_id"],
-            merged_files["batch_id"]
+            merged_result["update_path"]
         )
 
         # 6) merged batch opslaan als nieuwe open batch
         merged_batch = {
-            "batch_id": merged_files["batch_id"],
+            "batch_id": merged_result["batch_id"],
             "tab": "277",
             "status": "PENDING_IMPORT",
-            "update_path": merged_files["update_path"],
-            "pick_path": "",
-            "tekort_path": "",
-            "stats_path": "",
-            "debug_changes_path": merged_files["debug_changes_path"],
+            "update_path": merged_result["update_path"],
+            "pick_path": merged_result["pick_path"],
+            "tekort_path": merged_result["tekort_path"],
+            "stats_path": merged_result["stats_path"],
+            "debug_changes_path": merged_result["debug_changes_path"],
             "wc_path": str(self.app_state.wc_path or ""),
-            "cms_paths": list(self.engine.cms_paths),
-            "paths": [merged_files["update_path"], merged_files["debug_changes_path"]],
+            "cms_paths": all_cms_paths,
+            "paths": merged_result["paths"],
             "merge_source": True,
-            "merged_from": [open_batch["batch_id"], new_result["batch_id"]],
+            "merged_from": [open_batch["batch_id"]],
         }
         self.batch_store.create_batch(merged_batch)
 
@@ -245,9 +288,9 @@ class TabWebsite277(QWidget):
         self.log.append("\nSamenvoegen voltooid.")
         self.log.append(f"Oude batch samengevoegd: {open_batch['batch_id']}")
         self.log.append(f"Nieuwe batch samengevoegd: {new_result['batch_id']}")
-        self.log.append(f"Nieuwe merged batch: {merged_files['batch_id']}")
-        self.log.append(f"- {merged_files['update_path']}")
-        self.log.append(f"- {merged_files['debug_changes_path']}")
+        self.log.append(f"Nieuwe merged batch: {merged_result['batch_id']}")
+        self.log.append(f"- {merged_result['update_path']}")
+        self.log.append(f"- {merged_result['debug_changes_path']}")
 
         self.engine.clear()
         self._sync_label()
@@ -275,10 +318,19 @@ class TabWebsite277(QWidget):
         if not paths:
             return
 
-        for p in paths:
+        keep, skipped = self._dedupe_new_paths(paths)
+
+        for p in keep:
             self.engine.add_cms_277(p)
 
-        self.log.append(f"{len(paths)} CMS 277 bestand(en) toegevoegd")
+        if keep:
+            self.log.append(f"{len(keep)} CMS 277 bestand(en) toegevoegd")
+
+        if skipped:
+            self.log.append(f"{len(skipped)} bestand(en) overgeslagen omdat ze al geladen waren:")
+            for p in skipped:
+                self.log.append(f"- {p}")
+
         self._sync_label()
 
     def on_run(self):
@@ -287,15 +339,38 @@ class TabWebsite277(QWidget):
         if pending:
             open_batch = pending[-1]
 
+            overlap = self._find_overlapping_paths_with_batch(open_batch)
+            if overlap and len(overlap) == len(self.engine.cms_paths) and self.engine.cms_paths:
+                QMessageBox.warning(
+                    self,
+                    "Dubbele run geblokkeerd",
+                    "Alle geselecteerde CMS-bestanden zitten al in de open batch.\n\n"
+                    "Deze run zou waarschijnlijk dubbel afboeken.\n"
+                    "Laad alleen nieuwe bestanden of markeer de open batch eerst als geïmporteerd."
+                )
+                self.log.append("Run geblokkeerd: alle geselecteerde CMS-bestanden zaten al in de open batch.")
+                self._update_batch_status()
+                return
+
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Warning)
             msg.setWindowTitle("Open website-update")
-            msg.setText(
+            text = (
                 "Er staat al een open 277 website-update.\n\n"
                 f"Batch: {open_batch.get('batch_id', '-')}\n"
-                f"Bestand:\n{open_batch.get('update_path', '-')}\n\n"
-                "Wat wil je doen?"
+                f"Bestand:\n{open_batch.get('update_path', '-')}\n"
             )
+
+            if overlap:
+                text += (
+                    "\n⚠️ Let op: één of meer CMS-bestanden uit deze nieuwe run "
+                    "zitten ook al in de open batch.\n"
+                    "Dat kan dubbele afboeking geven.\n"
+                )
+
+            text += "\nWat wil je doen?"
+
+            msg.setText(text)
 
             btn_cancel = msg.addButton("Annuleren", QMessageBox.RejectRole)
             btn_imported = msg.addButton("Eerst als geïmporteerd markeren", QMessageBox.AcceptRole)
