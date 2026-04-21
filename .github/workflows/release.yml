@@ -89,4 +89,5 @@ jobs:
           gh release create ${{ steps.version.outputs.tag }} `
             --title "Suzuki Parts Manager ${{ steps.version.outputs.tag }}" `
             --notes "Automatische release van versie ${{ steps.version.outputs.tag }}." `
+            --latest `
             "Suzuki.Parts.Manager.zip"
