@@ -1,466 +1,609 @@
-
-# ============================================================
 # tabs/tab_website_277.py
-# UI – Website / CMS 277
-# Batch-afboeken (alleen voorraad)
-# ============================================================
-
-from os import path
-
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QFileDialog,
-    QMessageBox, QTextEdit
-)
-from PySide6.QtCore import Qt
 import os
 from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QFileDialog, QMessageBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QFrame, QAbstractItemView, QScrollArea
+)
 
 from engines.engine_website_277 import Website277Engine
 from services.batch_state import BatchStore
-from services.batch_merge_277 import (
-    load_changes,
-    merge_changes,
-    build_update_from_changes,
-    save_merged_files,
-)
 from utils.paths import output_root
 from utils.theme import apply_theme
 
+
 class TabWebsite277(QWidget):
+
+    S_IDLE            = "idle"
+    S_BESTELLING      = "bestelling"   # stap 1 klaar, stap 2 actief
+    S_AFGEBOEKT       = "afgeboekt"    # stap 2 klaar, stap 3 actief
+    S_WACHT_IMPORT    = "wacht"        # export klaar, wacht op "ik heb het gedaan"
+
     def __init__(self, app_state):
         super().__init__()
         self.app_state = app_state
-        self.engine = Website277Engine(app_state)
-        self.batch_store = BatchStore()
-        self._build_ui()
+        self.engine    = Website277Engine(app_state)
+        self.store     = BatchStore()
 
-    # --------------------------------------------------------
-    # UI
-    # --------------------------------------------------------
+        self._state       = self.S_IDLE
+        self._result      = None
+        self._update_path = None
+
+        self._build_ui()
+        self._restore_openstaande_bestelling()
+
+    # ─────────────────────────────────────────────────────────
+    # UI bouwen
+    # ─────────────────────────────────────────────────────────
+
     def _build_ui(self):
         apply_theme(self)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(12)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(16, 16, 16, 16)
+        outer.setSpacing(12)
 
-        # =========================
-        # TITEL
-        # =========================
-        title = QLabel("Website / 277 – Voorraad afboeken")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        root.addWidget(title)
+        # Titel
+        lbl = QLabel("Bestelling verwerken")
+        lbl.setStyleSheet("font-size: 22px; font-weight: bold;")
+        outer.addWidget(lbl)
 
-        # =========================
-        # UITLEG
-        # =========================
-        uitleg = QLabel(
-            "Verwerkt website/CMS bestellingen (277).\n\n"
-            "① Zorg dat WooCommerce export geladen is\n"
-            "② Voeg CMS bestanden toe\n"
-            "③ Start afboeken\n\n"
-            "• Alleen voorraad wordt aangepast\n"
-            "• Tekorten worden apart gelogd"
+        # Waarschuwingsbanner (verborgen totdat nodig)
+        self.banner = self._maak_banner()
+        outer.addWidget(self.banner)
+        self.banner.hide()
+
+        # Stap-indicator
+        self.stap_indicator = self._maak_stap_indicator()
+        outer.addWidget(self.stap_indicator)
+
+        # Scrollbaar gebied voor de 3 stappen
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        content = QWidget()
+        vbox = QVBoxLayout(content)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(14)
+
+        self.frame_stap1 = self._maak_stap1()
+        self.frame_stap2 = self._maak_stap2()
+        self.frame_stap3 = self._maak_stap3()
+
+        vbox.addWidget(self.frame_stap1)
+        vbox.addWidget(self.frame_stap2)
+        vbox.addWidget(self.frame_stap3)
+        vbox.addStretch()
+
+        scroll.setWidget(content)
+        outer.addWidget(scroll, stretch=1)
+
+        self._ververs_ui()
+
+    # ── Banner ────────────────────────────────────────────────
+
+    def _maak_banner(self):
+        frame = QFrame()
+        frame.setObjectName("banner")
+        frame.setStyleSheet("""
+            QFrame#banner {
+                background: rgba(234,88,12,0.12);
+                border: 2px solid #ea580c;
+                border-radius: 10px;
+            }
+        """)
+        lay = QVBoxLayout(frame)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(10)
+
+        self.banner_lbl = QLabel()
+        self.banner_lbl.setWordWrap(True)
+        self.banner_lbl.setStyleSheet(
+            "font-size: 13px; font-weight: bold; color: #9a3412;"
+            "background: transparent; border: none;"
         )
-        uitleg.setWordWrap(True)
-        root.addWidget(uitleg)
+        lay.addWidget(self.banner_lbl)
 
-        # =========================
-        # STATUS BLOK
-        # =========================
-        self.lbl_wc = QLabel()
-        self.lbl_batch = QLabel()
+        rij = QHBoxLayout()
+        self.btn_banner_ja  = QPushButton("Ja, dat was al gedaan")
+        self.btn_banner_nee = QPushButton("Nee, ik doe dat eerst")
+        self.btn_banner_ja.setObjectName("secondary")
+        self.btn_banner_nee.setObjectName("primary")
+        self.btn_banner_ja.setMinimumHeight(40)
+        self.btn_banner_nee.setMinimumHeight(40)
+        self.btn_banner_ja.clicked.connect(self._banner_al_gedaan)
+        self.btn_banner_nee.clicked.connect(self._banner_nog_doen)
+        rij.addWidget(self.btn_banner_nee)
+        rij.addWidget(self.btn_banner_ja)
+        rij.addStretch()
+        lay.addLayout(rij)
+        return frame
 
-        for lbl in (self.lbl_wc, self.lbl_batch):
-            lbl.setWordWrap(True)
-            lbl.setStyleSheet("""
-                QLabel {
-                    background: palette(base);
-                    border: 1px solid palette(mid);
-                    border-radius: 8px;
-                    padding: 10px;
-                }
-            """)
+    # ── Stap-indicator ────────────────────────────────────────
 
-        root.addWidget(self.lbl_wc)
-        root.addWidget(self.lbl_batch)
+    def _maak_stap_indicator(self):
+        frame = QFrame()
+        lay = QHBoxLayout(frame)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
 
-        self._update_wc()
-        self._update_batch_status()
+        self._prog = []
+        namen = ["① Bestelling laden", "② Afboeken", "③ Website bijwerken"]
+        for i, naam in enumerate(namen):
+            lbl = QLabel(naam)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setMinimumHeight(38)
+            self._prog.append(lbl)
+            lay.addWidget(lbl, stretch=1)
+            if i < len(namen) - 1:
+                pijl = QLabel("›")
+                pijl.setAlignment(Qt.AlignCenter)
+                pijl.setStyleSheet("font-size: 20px; color: palette(mid); background: transparent;")
+                lay.addWidget(pijl)
+        return frame
 
-        # =========================
-        # ACTIES (boven)
-        # =========================
-        row_actions = QHBoxLayout()
+    # ── Stap 1 ────────────────────────────────────────────────
 
-        btn_add = QPushButton("Add CMS 277 orders")
-        btn_add.setObjectName("primary")
-        btn_add.clicked.connect(self.on_add)
+    def _maak_stap1(self):
+        frame = self._stap_frame()
+        lay = QVBoxLayout(frame)
+        lay.setContentsMargins(18, 16, 18, 16)
+        lay.setSpacing(10)
 
-        btn_reset = QPushButton("Reset")
-        btn_reset.setObjectName("secondary")
-        btn_reset.clicked.connect(self.on_reset)
+        lay.addWidget(self._stap_titel("Stap 1 — Laad de bestelling"))
+        lay.addWidget(self._info_lbl(
+            "Klik hieronder en kies het Excel-bestand dat je via e-mail hebt ontvangen."
+        ))
 
-        self.lbl_count = QLabel("0 bestanden geladen")
+        btn = QPushButton("Laad bestelling")
+        btn.setObjectName("primary")
+        btn.setMinimumHeight(52)
+        btn.setStyleSheet("font-size: 13pt;")
+        btn.clicked.connect(self._laad_bestelling)
+        lay.addWidget(btn)
 
-        row_actions.addWidget(btn_add)
-        row_actions.addWidget(btn_reset)
-        row_actions.addStretch()
-        row_actions.addWidget(self.lbl_count)
+        self.lbl_geladen = QLabel("Nog geen bestelling geladen.")
+        self.lbl_geladen.setWordWrap(True)
+        self.lbl_geladen.setStyleSheet(self._info_box_style())
+        lay.addWidget(self.lbl_geladen)
 
-        root.addLayout(row_actions)
+        self.btn_volgende1 = QPushButton("Volgende  →")
+        self.btn_volgende1.setObjectName("primary")
+        self.btn_volgende1.setMinimumHeight(44)
+        self.btn_volgende1.setEnabled(False)
+        self.btn_volgende1.clicked.connect(lambda: self._zet_staat(self.S_BESTELLING))
+        lay.addWidget(self.btn_volgende1)
 
-        # =========================
-        # RUN ACTIES (duidelijk)
-        # =========================
-        row_run = QHBoxLayout()
+        return frame
 
-        btn_run = QPushButton("Start afboeken")
-        btn_run.setObjectName("primary")
-        btn_run.setMinimumHeight(40)
-        btn_run.clicked.connect(self.on_run)
+    # ── Stap 2 ────────────────────────────────────────────────
 
-        btn_open = QPushButton("Open output")
-        btn_open.setObjectName("secondary")
-        btn_open.clicked.connect(self.on_open_output)
+    def _maak_stap2(self):
+        frame = self._stap_frame()
+        lay = QVBoxLayout(frame)
+        lay.setContentsMargins(18, 16, 18, 16)
+        lay.setSpacing(10)
 
-        btn_mark = QPushButton("Markeer als geïmporteerd")
-        btn_mark.setObjectName("secondary")
-        btn_mark.clicked.connect(self.on_mark_imported)
+        lay.addWidget(self._stap_titel("Stap 2 — Controleer en afboeken"))
+        lay.addWidget(self._info_lbl(
+            "Hieronder zie je wat er besteld is. Controleer of de aantallen kloppen."
+        ))
 
-        row_run.addWidget(btn_run)
-        row_run.addWidget(btn_open)
-        row_run.addWidget(btn_mark)
-        row_run.addStretch()
+        self.tbl_order = QTableWidget()
+        self.tbl_order.setColumnCount(3)
+        self.tbl_order.setHorizontalHeaderLabels(["Artikelnummer", "Aantal", "Factuurnummer"])
+        self.tbl_order.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tbl_order.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tbl_order.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.tbl_order.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tbl_order.setMinimumHeight(160)
+        self.tbl_order.setMaximumHeight(280)
+        lay.addWidget(self.tbl_order)
 
-        root.addLayout(row_run)
+        btn = QPushButton("Afboeken en picklijst openen")
+        btn.setObjectName("primary")
+        btn.setMinimumHeight(56)
+        btn.setStyleSheet("font-size: 13pt;")
+        btn.clicked.connect(self._afboeken)
+        lay.addWidget(btn)
 
-        # =========================
-        # LOG
-        # =========================
-        self.log = QTextEdit()
-        self.log.setReadOnly(True)
-        self.log.setPlaceholderText("Log verschijnt hier...")
-        root.addWidget(self.log, stretch=1)
+        lbl_hint = QLabel("De picklijst opent automatisch zodra het afboeken klaar is.")
+        lbl_hint.setStyleSheet("color: palette(mid); font-style: italic; font-size: 10pt;")
+        lay.addWidget(lbl_hint)
 
-        self._sync_label()
+        return frame
 
-    # --------------------------------------------------------
-    # HELPERS
-    # --------------------------------------------------------
-    def _find_overlapping_paths_with_batch(self, open_batch: dict):
-        old_paths = {
-            self._normalize_path(p)
-            for p in open_batch.get("cms_paths", [])
-            if str(p).strip()
-        }
-        new_paths = {
-            self._normalize_path(p)
-            for p in self.engine.cms_paths
-            if str(p).strip()
-        }
-        return sorted(old_paths & new_paths)
-    
-    def _normalize_path(self, path: str) -> str:
-        return os.path.normcase(os.path.abspath(str(path or "")))
-    
-    def _dedupe_new_paths(self, paths):
-        existing = {self._normalize_path(p) for p in self.engine.cms_paths}
-        keep = []
-        skipped = []
+    # ── Stap 3 ────────────────────────────────────────────────
 
-        for p in paths:
-            np = self._normalize_path(p)
-            if np in existing:
-                skipped.append(p)
-                continue
-            existing.add(np)
-            keep.append(p)
+    def _maak_stap3(self):
+        frame = self._stap_frame()
+        lay = QVBoxLayout(frame)
+        lay.setContentsMargins(18, 16, 18, 16)
+        lay.setSpacing(10)
 
-        return keep, skipped
-    
-    def _update_wc(self):
-        if self.app_state.wc_path and os.path.exists(self.app_state.wc_path):
-            mtime = os.path.getmtime(self.app_state.wc_path)
-            laatst = datetime.fromtimestamp(mtime).strftime("%d-%m-%Y %H:%M:%S")
-            self.lbl_wc.setText(f"✅ WC-export in gebruik:\n{self.app_state.wc_path}\nLaatst gewijzigd: {laatst}")
-        else:
-            self.lbl_wc.setText("❌ Geen WC-export geladen")
+        lay.addWidget(self._stap_titel("Stap 3 — Zet de wijzigingen op de website"))
+        lay.addWidget(self._info_lbl(
+            "Hieronder zie je de nieuwe voorraad per product. "
+            "Klopt er een getal niet? Dubbelklik erop en pas het aan."
+        ))
 
+        self.tbl_update = QTableWidget()
+        self.tbl_update.setColumnCount(3)
+        self.tbl_update.setHorizontalHeaderLabels(["Artikelnummer", "Nieuwe voorraad", "Locatie"])
+        self.tbl_update.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tbl_update.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tbl_update.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.tbl_update.setMinimumHeight(180)
+        self.tbl_update.setMaximumHeight(320)
+        lay.addWidget(self.tbl_update)
 
-    def _update_batch_status(self):
-        batch = self.batch_store.get_latest_open_batch("277")
+        btn_export = QPushButton("Maak bestand klaar voor de website")
+        btn_export.setObjectName("primary")
+        btn_export.setMinimumHeight(52)
+        btn_export.setStyleSheet("font-size: 13pt;")
+        btn_export.clicked.connect(self._exporteer_update)
+        lay.addWidget(btn_export)
+
+        self.lbl_export_klaar = QLabel("")
+        self.lbl_export_klaar.setWordWrap(True)
+        self.lbl_export_klaar.hide()
+        self.lbl_export_klaar.setStyleSheet("""
+            QLabel {
+                background: rgba(22,163,74,0.10);
+                border: 2px solid #16a34a;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 12pt;
+                font-weight: bold;
+                color: #14532d;
+            }
+        """)
+        lay.addWidget(self.lbl_export_klaar)
+
+        self.btn_klaar = QPushButton("✅   Ik heb het geïmporteerd — Klaar!")
+        self.btn_klaar.setObjectName("primary")
+        self.btn_klaar.setMinimumHeight(58)
+        self.btn_klaar.setStyleSheet(
+            "font-size: 14pt; font-weight: bold;"
+            "background-color: #16a34a; border-color: #16a34a; color: white;"
+        )
+        self.btn_klaar.hide()
+        self.btn_klaar.clicked.connect(self._markeer_klaar)
+        lay.addWidget(self.btn_klaar)
+
+        return frame
+
+    # ─────────────────────────────────────────────────────────
+    # State machine
+    # ─────────────────────────────────────────────────────────
+
+    def _zet_staat(self, staat):
+        self._state = staat
+        self._ververs_ui()
+
+    def _ververs_ui(self):
+        s = self._state
+
+        ACTIEF  = ("font-size:11pt; font-weight:bold; padding:6px 14px;"
+                   "background:#2563EB; color:white; border:2px solid #2563EB; border-radius:4px;")
+        KLAAR   = ("font-size:11pt; font-weight:bold; padding:6px 14px;"
+                   "background:#16a34a; color:white; border:2px solid #16a34a; border-radius:4px;")
+        INACTIEF= ("font-size:11pt; padding:6px 14px;"
+                   "background:palette(base); color:palette(mid); border:1px solid palette(mid); border-radius:4px;")
+
+        if s == self.S_IDLE:
+            stijlen = [ACTIEF, INACTIEF, INACTIEF]
+        elif s == self.S_BESTELLING:
+            stijlen = [KLAAR, ACTIEF, INACTIEF]
+        else:  # AFGEBOEKT / WACHT_IMPORT
+            stijlen = [KLAAR, KLAAR, ACTIEF]
+
+        for lbl, stijl in zip(self._prog, stijlen):
+            lbl.setStyleSheet(stijl)
+
+        # Frames: actief = blauwe rand, inactief = grijze rand + disabled
+        actief_rand  = "QFrame { border:2px solid #2563EB; border-radius:10px; background:palette(base); }"
+        inactief_rand= "QFrame { border:2px solid palette(mid); border-radius:10px; background:palette(window); }"
+
+        stap1_aan = s == self.S_IDLE
+        stap2_aan = s == self.S_BESTELLING
+        stap3_aan = s in (self.S_AFGEBOEKT, self.S_WACHT_IMPORT)
+
+        self.frame_stap1.setStyleSheet(actief_rand  if stap1_aan else inactief_rand)
+        self.frame_stap2.setStyleSheet(actief_rand  if stap2_aan else inactief_rand)
+        self.frame_stap3.setStyleSheet(actief_rand  if stap3_aan else inactief_rand)
+
+        self.frame_stap1.setEnabled(stap1_aan)
+        self.frame_stap2.setEnabled(stap2_aan)
+        self.frame_stap3.setEnabled(stap3_aan)
+
+        # Groene klaar-knop pas zichtbaar na export
+        self.btn_klaar.setVisible(s == self.S_WACHT_IMPORT)
+
+    # ─────────────────────────────────────────────────────────
+    # Banner: openstaande bestelling
+    # ─────────────────────────────────────────────────────────
+
+    def _restore_openstaande_bestelling(self):
+        batch = self.store.get_latest_open_batch("277")
+        if not batch:
+            return
+
+        try:
+            dt = datetime.fromisoformat(batch.get("created_at", ""))
+            datum = dt.strftime("%d-%m-%Y om %H:%M")
+        except Exception:
+            datum = batch.get("created_at", "")
+
+        self.banner_lbl.setText(
+            f"⚠️  Let op — Er staat nog een niet-afgeronde bestelling open van {datum}.\n\n"
+            "Heb je het bestand al in WP All Import op de website gezet?"
+        )
+        self.banner.show()
+        self._result      = batch
+        self._update_path = batch.get("update_path", "")
+
+    def _banner_al_gedaan(self):
+        batch = self.store.get_latest_open_batch("277")
         if batch:
-            created = batch.get("created_at", "-")
-            update_path = batch.get("update_path", "-")
-            self.lbl_batch.setText(
-                "⚠️ Open website-update aanwezig\n"
-                f"Batch: {batch.get('batch_id', '-')}\n"
-                f"Aangemaakt: {created}\n"
-                f"Status: {batch.get('status', '-')}\n"
-                f"Updatebestand:\n{update_path}"
+            self.store.mark_imported(batch["batch_id"])
+        self.banner.hide()
+        self._result      = None
+        self._update_path = None
+        self._zet_staat(self.S_IDLE)
+
+    def _banner_nog_doen(self):
+        self.banner.hide()
+        # Herstel stap 3 met het openstaande bestand
+        if self._update_path and os.path.exists(self._update_path):
+            self._laad_update_tabel(self._update_path)
+            self.lbl_export_klaar.setText(
+                f"Bestand staat klaar.\n\n"
+                f"Ga naar WP All Import en importeer:\n\n"
+                f"{Path(self._update_path).name}\n\n"
+                f"Volledige locatie:\n{self._update_path}"
             )
+            self.lbl_export_klaar.show()
+            self._zet_staat(self.S_WACHT_IMPORT)
         else:
-            self.lbl_batch.setText("✅ Geen open website-update voor 277")
-
-    def _run_merge_with_open_batch(self, open_batch: dict):
-        # 1) draai eerst de nieuwe run gewoon normaal
-        try:
-            new_result = self.engine.run()
-        except Exception as e:
-            QMessageBox.critical(self, "Fout", str(e))
-            return
-
-        # 2) lees oude changes + nieuwe changes
-        old_changes_path = open_batch.get("debug_changes_path", "")
-        new_changes_path = new_result.get("debug_changes_path", "")
-
-        try:
-            old_df = load_changes(old_changes_path)
-            new_df = load_changes(new_changes_path)
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Merge fout",
-                f"CHANGES bestand kon niet gelezen worden.\n\n{e}"
+            QMessageBox.warning(
+                self, "Bestand niet gevonden",
+                "Het bestand van de vorige bestelling is niet meer te vinden.\n"
+                "Je moet de bestelling opnieuw afboeken."
             )
-            return
+            batch = self.store.get_latest_open_batch("277")
+            if batch:
+                self.store.mark_imported(batch["batch_id"])
+            self._zet_staat(self.S_IDLE)
 
-        # 3) merge changes
-        try:
-            merged_changes_df = merge_changes(old_df, new_df)
-            # 🔥 NIEUW: engine opnieuw laten draaien met gecombineerde input
+    # ─────────────────────────────────────────────────────────
+    # Stap 1 — Bestelling laden
+    # ─────────────────────────────────────────────────────────
 
-            # combineer alle cms bestanden van oude + nieuwe batch
-            all_cms_paths = list(set(
-                list(open_batch.get("cms_paths", [])) +
-                list(self.engine.cms_paths)
-            ))
-
-            # reset engine en voeg alles opnieuw toe
-            self.engine.clear()
-            for p in all_cms_paths:
-                self.engine.add_cms_277(p)
-
-            # draai engine opnieuw → maakt ALLES opnieuw
-            merged_result = self.engine.run()
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Merge fout",
-                f"Samenvoegen is mislukt.\n\n{e}"
-            )
-            return
-
-        # 4) oude open batch op MERGED zetten
-        self.batch_store.mark_merged(
-            open_batch["batch_id"],
-            merged_result["batch_id"]
+    def _laad_bestelling(self):
+        paden, _ = QFileDialog.getOpenFileNames(
+            self, "Kies het bestellingbestand", "", "Excel bestanden (*.xlsx)"
         )
-
-        # 5) nieuwe gewone batch ook op MERGED zetten
-        self.batch_store.create_batch(new_result)
-        self.batch_store.mark_merged(
-            new_result["batch_id"],
-            merged_result["update_path"]
-        )
-
-        # 6) merged batch opslaan als nieuwe open batch
-        merged_batch = {
-            "batch_id": merged_result["batch_id"],
-            "tab": "277",
-            "status": "PENDING_IMPORT",
-            "update_path": merged_result["update_path"],
-            "pick_path": merged_result["pick_path"],
-            "tekort_path": merged_result["tekort_path"],
-            "stats_path": merged_result["stats_path"],
-            "debug_changes_path": merged_result["debug_changes_path"],
-            "wc_path": str(self.app_state.wc_path or ""),
-            "cms_paths": all_cms_paths,
-            "paths": merged_result["paths"],
-            "merge_source": True,
-            "merged_from": [open_batch["batch_id"]],
-        }
-        self.batch_store.create_batch(merged_batch)
-
-        # 7) UI/log opschonen
-        self.log.append("\nSamenvoegen voltooid.")
-        self.log.append(f"Oude batch samengevoegd: {open_batch['batch_id']}")
-        self.log.append(f"Nieuwe batch samengevoegd: {new_result['batch_id']}")
-        self.log.append(f"Nieuwe merged batch: {merged_result['batch_id']}")
-        self.log.append(f"- {merged_result['update_path']}")
-        self.log.append(f"- {merged_result['debug_changes_path']}")
+        if not paden:
+            return
 
         self.engine.clear()
-        self._sync_label()
-        self._update_batch_status()
-
-        QMessageBox.information(
-            self,
-            "Samenvoegen klaar",
-            "De open batch en de nieuwe run zijn samengevoegd.\n\n"
-            "Er staat nu 1 nieuwe merged website-update open op WACHT OP IMPORT."
-        )
-    def _sync_label(self):
-        self.lbl_count.setText(f"{len(self.engine.cms_paths)} CMS 277 bestand(en) toegevoegd")
-
-    # --------------------------------------------------------
-    # ACTIONS
-    # --------------------------------------------------------
-    def on_add(self):
-        paths, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Selecteer CMS 277 bestellingen",
-            "",
-            "Excel (*.xlsx)"
-        )
-        if not paths:
-            return
-
-        keep, skipped = self._dedupe_new_paths(paths)
-
-        for p in keep:
+        for p in paden:
             self.engine.add_cms_277(p)
 
-        if keep:
-            self.log.append(f"{len(keep)} CMS 277 bestand(en) toegevoegd")
+        self._vul_order_tabel()
 
-        if skipped:
-            self.log.append(f"{len(skipped)} bestand(en) overgeslagen omdat ze al geladen waren:")
-            for p in skipped:
-                self.log.append(f"- {p}")
+        namen = ", ".join(Path(p).name for p in paden)
+        n     = len(paden)
+        self.lbl_geladen.setText(
+            f"✅  {n} bestand{'en' if n > 1 else ''} geladen:\n{namen}"
+        )
+        self.btn_volgende1.setEnabled(True)
 
-        self._sync_label()
+    def _vul_order_tabel(self):
+        rijen = []
+        for p in self.engine.cms_paths:
+            try:
+                df = pd.read_excel(p, header=None, dtype=str).fillna("")
+                df.columns = range(len(df.columns))
+                for _, r in df.iterrows():
+                    title   = str(r.get(0, "")).strip()
+                    aantal  = str(r.get(2, "")).strip()
+                    factuur = str(r.get(4, "")).strip()
+                    if title:
+                        rijen.append((title, aantal, factuur))
+            except Exception:
+                pass
 
-    def on_run(self):
-        pending = self.batch_store.get_open_batches("277")
+        self.tbl_order.setRowCount(len(rijen))
+        for i, (title, aantal, factuur) in enumerate(rijen):
+            for kolom, tekst in enumerate([title, aantal, factuur]):
+                item = QTableWidgetItem(tekst)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                self.tbl_order.setItem(i, kolom, item)
 
-        if pending:
-            open_batch = pending[-1]
+    # ─────────────────────────────────────────────────────────
+    # Stap 2 — Afboeken
+    # ─────────────────────────────────────────────────────────
 
-            overlap = self._find_overlapping_paths_with_batch(open_batch)
-            if overlap and len(overlap) == len(self.engine.cms_paths) and self.engine.cms_paths:
-                QMessageBox.warning(
-                    self,
-                    "Dubbele run geblokkeerd",
-                    "Alle geselecteerde CMS-bestanden zitten al in de open batch.\n\n"
-                    "Deze run zou waarschijnlijk dubbel afboeken.\n"
-                    "Laad alleen nieuwe bestanden of markeer de open batch eerst als geïmporteerd."
-                )
-                self.log.append("Run geblokkeerd: alle geselecteerde CMS-bestanden zaten al in de open batch.")
-                self._update_batch_status()
-                return
-
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Warning)
-            msg.setWindowTitle("Open website-update")
-            text = (
-                "Er staat al een open 277 website-update.\n\n"
-                f"Batch: {open_batch.get('batch_id', '-')}\n"
-                f"Bestand:\n{open_batch.get('update_path', '-')}\n"
-            )
-
-            if overlap:
-                text += (
-                    "\n⚠️ Let op: één of meer CMS-bestanden uit deze nieuwe run "
-                    "zitten ook al in de open batch.\n"
-                    "Dat kan dubbele afboeking geven.\n"
-                )
-
-            text += "\nWat wil je doen?"
-
-            msg.setText(text)
-
-            btn_cancel = msg.addButton("Annuleren", QMessageBox.RejectRole)
-            btn_imported = msg.addButton("Eerst als geïmporteerd markeren", QMessageBox.AcceptRole)
-            btn_merge = msg.addButton("Samenvoegen met nieuwe run", QMessageBox.ActionRole)
-
-            msg.exec()
-
-            clicked = msg.clickedButton()
-
-            if clicked == btn_cancel:
-                self._update_batch_status()
-                return
-
-            if clicked == btn_imported:
-                ok = self.batch_store.mark_imported(open_batch["batch_id"])
-                if ok:
-                    self.log.append(f"Batch gemarkeerd als geïmporteerd: {open_batch['batch_id']}")
-                    self._update_batch_status()
-                    QMessageBox.information(
-                        self,
-                        "Bijgewerkt",
-                        "De open batch is gemarkeerd als geïmporteerd.\n"
-                        "Start de run daarna opnieuw."
-                    )
-                else:
-                    QMessageBox.warning(
-                        self,
-                        "Niet gelukt",
-                        "De batch kon niet als geïmporteerd gemarkeerd worden."
-                    )
-                return
-
-            if clicked == btn_merge:
-                self._run_merge_with_open_batch(open_batch)
-                return
-
+    def _afboeken(self):
+        if not self.engine.cms_paths:
+            QMessageBox.warning(self, "Geen bestelling", "Laad eerst een bestelling in stap 1.")
             return
 
-        # normale run als er geen open batch is
+        if getattr(self.app_state, "wc_df", None) is None:
+            QMessageBox.warning(
+                self, "WooCommerce export ontbreekt",
+                "Ga eerst naar het tabblad 'Start' en laad de WooCommerce export."
+            )
+            return
+
         try:
             result = self.engine.run()
         except Exception as e:
-            QMessageBox.critical(self, "Fout", str(e))
+            QMessageBox.critical(self, "Er ging iets mis", str(e))
             return
 
-        self.batch_store.create_batch(result)
+        self._result      = result
+        self._update_path = result.get("update_path", "")
 
-        self.log.append("\nVerwerking voltooid. Output:")
-        for r in result.get("paths", []):
-            self.log.append(f"- {r}")
+        self.store.create_batch(result)
 
-        self.log.append(
-            f"\nNieuwe open batch aangemaakt: {result.get('batch_id', '-')}\n"
-            "Status: WACHT OP IMPORT"
-        )
+        # Picklijst automatisch openen
+        pick = result.get("pick_path", "")
+        if pick and os.path.exists(pick):
+            try:
+                os.startfile(pick)
+            except Exception:
+                pass
 
-        self.engine.clear()
-        self._sync_label()
-        self._update_batch_status()
+        # Update-tabel laden voor stap 3
+        if self._update_path and os.path.exists(self._update_path):
+            self._laad_update_tabel(self._update_path)
+
+        self._zet_staat(self.S_AFGEBOEKT)
 
         QMessageBox.information(
-            self,
-            "277 klaar",
-            "277 afboeken is afgerond.\n\n"
-            "Let op: de website-update staat nu nog op WACHT OP IMPORT.\n"
-            "Markeer hem pas als geïmporteerd nadat WP All Import gedaan is."
+            self, "Afboeken klaar",
+            "Klaar!\n\n"
+            "De picklijst is automatisch geopend.\n\n"
+            "Ga de producten pakken en kom daarna terug\n"
+            "voor stap 3 om de website bij te werken."
         )
 
-    def on_mark_imported(self):
-        batch = self.batch_store.get_latest_open_batch("277")
-        if not batch:
-            QMessageBox.information(self, "Geen open batch", "Er staat geen open 277-batch.")
+    def _laad_update_tabel(self, pad: str):
+        try:
+            df = pd.read_excel(pad, dtype=str).fillna("")
+        except Exception:
             return
 
-        ok = self.batch_store.mark_imported(batch["batch_id"])
-        if not ok:
-            QMessageBox.warning(self, "Niet gelukt", "Batch kon niet als geïmporteerd gemarkeerd worden.")
+        col_title = next((c for c in df.columns if str(c).lower() == "title"), None)
+        col_stock = next((c for c in df.columns if str(c).lower() == "stock"), None)
+        col_loc   = next((c for c in df.columns if str(c).lower() == "locatie"), None)
+
+        if not col_title or not col_stock:
             return
 
-        self.log.append(f"Batch gemarkeerd als geïmporteerd: {batch['batch_id']}")
-        self._update_batch_status()
-        QMessageBox.information(self, "Bijgewerkt", "De open 277-batch is gemarkeerd als geïmporteerd.")
+        self._update_df_kolommen = (col_title, col_stock, col_loc)
 
-    def on_reset(self):
+        self.tbl_update.setRowCount(len(df))
+        for i, (_, r) in enumerate(df.iterrows()):
+            title = str(r.get(col_title, ""))
+            stock = str(r.get(col_stock, ""))
+            loc   = str(r.get(col_loc, "")) if col_loc else ""
+
+            item_t = QTableWidgetItem(title)
+            item_t.setFlags(item_t.flags() & ~Qt.ItemIsEditable)
+
+            item_s = QTableWidgetItem(stock)   # bewerkbaar
+
+            item_l = QTableWidgetItem(loc)
+            item_l.setFlags(item_l.flags() & ~Qt.ItemIsEditable)
+
+            self.tbl_update.setItem(i, 0, item_t)
+            self.tbl_update.setItem(i, 1, item_s)
+            self.tbl_update.setItem(i, 2, item_l)
+
+    # ─────────────────────────────────────────────────────────
+    # Stap 3 — Website update exporteren
+    # ─────────────────────────────────────────────────────────
+
+    def _exporteer_update(self):
+        if not self._update_path or not os.path.exists(self._update_path):
+            QMessageBox.warning(self, "Bestand niet gevonden",
+                                "Het website-updatebestand is niet gevonden.")
+            return
+
+        try:
+            df = pd.read_excel(self._update_path, dtype=str).fillna("")
+            col_title, col_stock, _ = getattr(self, "_update_df_kolommen", ("Title", "Stock", "Locatie"))
+
+            # Schrijf eventuele tabelaanpassingen terug
+            if col_stock in df.columns and col_title in df.columns:
+                for rij in range(self.tbl_update.rowCount()):
+                    t_item = self.tbl_update.item(rij, 0)
+                    s_item = self.tbl_update.item(rij, 1)
+                    if t_item and s_item and rij < len(df):
+                        df.at[df.index[rij], col_stock] = s_item.text()
+
+            df.to_excel(self._update_path, index=False)
+
+            naam = Path(self._update_path).name
+            self.lbl_export_klaar.setText(
+                f"✅  Bestand is klaar!\n\n"
+                f"Ga nu naar WP All Import en importeer dit bestand:\n\n"
+                f"📄  {naam}\n\n"
+                f"Locatie:\n{self._update_path}"
+            )
+            self.lbl_export_klaar.show()
+            self._zet_staat(self.S_WACHT_IMPORT)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Fout bij opslaan", str(e))
+
+    def _markeer_klaar(self):
+        batch = self.store.get_latest_open_batch("277")
+        if batch:
+            self.store.mark_imported(batch["batch_id"])
+
         self.engine.clear()
-        self.log.clear()
-        self._sync_label()
-        self._update_batch_status()
+        self._result      = None
+        self._update_path = None
 
-    def on_open_output(self):
-        folder = output_root() / "277"
-        folder.mkdir(parents=True, exist_ok=True)
-        os.startfile(str(folder))
+        self.tbl_order.setRowCount(0)
+        self.tbl_update.setRowCount(0)
+        self.lbl_geladen.setText("Nog geen bestelling geladen.")
+        self.btn_volgende1.setEnabled(False)
+        self.lbl_export_klaar.hide()
+        self.banner.hide()
+
+        self._zet_staat(self.S_IDLE)
+
+        QMessageBox.information(
+            self, "Klaar!",
+            "Goed gedaan!\n\n"
+            "De bestelling is volledig verwerkt en de website is bijgewerkt.\n\n"
+            "Je kunt nu een nieuwe bestelling laden."
+        )
+
+    # ─────────────────────────────────────────────────────────
+    # Hulpfuncties
+    # ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _stap_frame():
+        f = QFrame()
+        f.setStyleSheet(
+            "QFrame { border:2px solid palette(mid); border-radius:10px; background:palette(base); }"
+        )
+        return f
+
+    @staticmethod
+    def _stap_titel(tekst):
+        lbl = QLabel(tekst)
+        lbl.setStyleSheet("font-size:15px; font-weight:bold; border:none; background:transparent;")
+        return lbl
+
+    @staticmethod
+    def _info_lbl(tekst):
+        lbl = QLabel(tekst)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("border:none; background:transparent;")
+        return lbl
+
+    @staticmethod
+    def _info_box_style():
+        return """
+            QLabel {
+                background: palette(window);
+                border: 1px solid palette(mid);
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """
