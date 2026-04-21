@@ -36,14 +36,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view ${{ steps.version.outputs.tag }} 2>$null
+          $ErrorActionPreference = 'Continue'
+          gh release view ${{ steps.version.outputs.tag }} 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
-            echo "exists=true" >> $env:GITHUB_OUTPUT
+            "exists=true" >> $env:GITHUB_OUTPUT
             Write-Host "Release ${{ steps.version.outputs.tag }} bestaat al — overgeslagen."
           } else {
-            echo "exists=false" >> $env:GITHUB_OUTPUT
+            "exists=false" >> $env:GITHUB_OUTPUT
             Write-Host "Nieuwe release: ${{ steps.version.outputs.tag }}"
           }
+          exit 0
 
       - name: Dependencies installeren
         if: steps.check.outputs.exists == 'false'
