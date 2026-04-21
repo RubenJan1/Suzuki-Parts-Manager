@@ -23,10 +23,6 @@ def _normalize_version(v: str) -> str:
 
 
 def _parse_version(v: str) -> tuple[int, ...]:
-    """
-    '1.2.3' -> (1, 2, 3)
-    Niet-numerieke stukjes worden genegeerd.
-    """
     cleaned = _normalize_version(v)
     parts = []
     for p in cleaned.split("."):
@@ -36,10 +32,6 @@ def _parse_version(v: str) -> tuple[int, ...]:
 
 
 def _pick_best_asset(assets: list[dict]) -> tuple[str, str]:
-    """
-    Kies liefst een zip of exe.
-    Retourneert (asset_name, browser_download_url).
-    """
     if not assets:
         return "", ""
 
@@ -65,42 +57,47 @@ def _pick_best_asset(assets: list[dict]) -> tuple[str, str]:
     return "", ""
 
 
-def check_github_release(
-    *,
-    current_version: str,
-    github_owner: str,
-    github_repo: str,
-    timeout_seconds: int = 3,
-) -> UpdateInfo:
-    """
-    Checkt de latest GitHub release.
-    Bij fout: geen crash, maar UpdateInfo met error.
-    """
-    api_url = f"https://api.github.com/repos/{github_owner}/{github_repo}/releases/latest"
-
+def _fetch_json(url: str, timeout: int) -> dict | list | None:
     req = urllib.request.Request(
-        api_url,
+        url,
         headers={
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": "Suzuki-Parts-Manager",
         },
     )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
+
+def check_github_release(
+    *,
+    current_version: str,
+    github_owner: str,
+    github_repo: str,
+    timeout_seconds: int = 8,
+) -> UpdateInfo:
+    base = f"https://api.github.com/repos/{github_owner}/{github_repo}"
+
+    # Probeer eerst /releases/latest (snelste pad)
     try:
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        data = _fetch_json(f"{base}/releases/latest", timeout_seconds)
+        releases = [data] if isinstance(data, dict) else []
     except urllib.error.HTTPError as e:
-        return UpdateInfo(
-            update_available=False,
-            current_version=current_version,
-            error=f"HTTP {e.code}",
-        )
+        if e.code == 404:
+            # Geen "latest" release (bijv. alleen prereleases) — haal lijst op
+            releases = []
+        else:
+            return UpdateInfo(
+                update_available=False,
+                current_version=current_version,
+                error=f"HTTP {e.code}",
+            )
     except urllib.error.URLError as e:
         return UpdateInfo(
             update_available=False,
             current_version=current_version,
-            error=f"Netwerkfout: {e.reason}",
+            error=f"Geen verbinding: {e.reason}",
         )
     except Exception as e:
         return UpdateInfo(
@@ -109,9 +106,45 @@ def check_github_release(
             error=str(e),
         )
 
-    latest_tag = str(data.get("tag_name", "") or "")
-    release_url = str(data.get("html_url", "") or "")
-    assets = data.get("assets", []) or []
+    # Fallback: haal de releases lijst op en pak de eerste niet-draft release
+    if not releases:
+        try:
+            data = _fetch_json(f"{base}/releases?per_page=10", timeout_seconds)
+            if isinstance(data, list):
+                for r in data:
+                    if not r.get("draft", False):
+                        releases = [r]
+                        break
+        except urllib.error.HTTPError as e:
+            return UpdateInfo(
+                update_available=False,
+                current_version=current_version,
+                error=f"HTTP {e.code}",
+            )
+        except urllib.error.URLError as e:
+            return UpdateInfo(
+                update_available=False,
+                current_version=current_version,
+                error=f"Geen verbinding: {e.reason}",
+            )
+        except Exception as e:
+            return UpdateInfo(
+                update_available=False,
+                current_version=current_version,
+                error=str(e),
+            )
+
+    if not releases:
+        return UpdateInfo(
+            update_available=False,
+            current_version=current_version,
+            error="Geen releases gevonden op GitHub.",
+        )
+
+    release = releases[0]
+    latest_tag = str(release.get("tag_name", "") or "")
+    release_url = str(release.get("html_url", "") or "")
+    assets = release.get("assets", []) or []
 
     asset_name, download_url = _pick_best_asset(assets)
 
@@ -119,7 +152,7 @@ def check_github_release(
         return UpdateInfo(
             update_available=False,
             current_version=current_version,
-            error="Geen tag_name gevonden in latest release.",
+            error="Geen versienummer gevonden in de release.",
         )
 
     current_parsed = _parse_version(current_version)
