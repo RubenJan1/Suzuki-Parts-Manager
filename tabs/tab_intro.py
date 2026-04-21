@@ -8,6 +8,9 @@ from PySide6.QtWidgets import (
     QPushButton, QFileDialog, QMessageBox, QFrame
 )
 from utils.theme import apply_theme
+from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO
+from services.update_checker import check_github_release
+from services.auto_updater import run_updater
 
 def extract_export_date_from_filename(path: str):
     """
@@ -189,6 +192,74 @@ class TabIntro(QWidget):
         root.addWidget(self.export_warning)
 
         root.addStretch()
+
+        # =========================
+        # VERSIE + UPDATE KNOP
+        # =========================
+        versie_rij = QHBoxLayout()
+        versie_rij.setSpacing(12)
+
+        self.lbl_versie = QLabel(f"Versie {APP_VERSION}")
+        self.lbl_versie.setStyleSheet("color: palette(mid); font-size: 11px;")
+        versie_rij.addWidget(self.lbl_versie)
+
+        self.btn_update = QPushButton("Controleer op updates")
+        self.btn_update.setObjectName("secondary")
+        self.btn_update.setFixedHeight(28)
+        self.btn_update.clicked.connect(self._controleer_updates)
+        versie_rij.addWidget(self.btn_update)
+        versie_rij.addStretch()
+
+        root.addLayout(versie_rij)
+
+    def _controleer_updates(self):
+        self.btn_update.setEnabled(False)
+        self.btn_update.setText("Bezig met controleren...")
+
+        info = check_github_release(
+            current_version=APP_VERSION,
+            github_owner=GITHUB_OWNER,
+            github_repo=GITHUB_REPO,
+            timeout_seconds=8,
+        )
+
+        self.btn_update.setEnabled(True)
+        self.btn_update.setText("Controleer op updates")
+
+        if info.error:
+            QMessageBox.warning(
+                self,
+                "Kan niet controleren",
+                f"Kon niet controleren op updates.\n\nFout: {info.error}\n\n"
+                "Controleer je internetverbinding en probeer het opnieuw."
+            )
+            return
+
+        if not info.update_available:
+            QMessageBox.information(
+                self,
+                "Je hebt de nieuwste versie",
+                f"Je hebt al de nieuwste versie ({APP_VERSION}).\nEr zijn geen updates beschikbaar."
+            )
+            return
+
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle("Update beschikbaar")
+        msg.setText(
+            f"Er is een nieuwe versie beschikbaar!\n\n"
+            f"Huidige versie:  {info.current_version}\n"
+            f"Nieuwe versie:   {info.latest_version}"
+        )
+        msg.setInformativeText("Wil je de update nu downloaden en installeren?")
+        btn_ja = msg.addButton("Ja, update nu", QMessageBox.AcceptRole)
+        msg.addButton("Nee, later", QMessageBox.RejectRole)
+        msg.exec()
+
+        if msg.clickedButton() == btn_ja:
+            target = info.download_url or info.release_url
+            if target:
+                run_updater(target)
 
     def load_wc_export(self):
         path, _ = QFileDialog.getOpenFileName(

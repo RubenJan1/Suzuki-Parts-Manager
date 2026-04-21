@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
 
         self.app_state = AppState()
 
-        self.setWindowTitle("Suzuki Parts Manager")
+        self.setWindowTitle(f"Suzuki Parts Manager v{APP_VERSION}")
         self.setWindowIcon(QIcon(str(resource_path("assets/app_icon.png"))))
         self.resize(1100, 750)
 
