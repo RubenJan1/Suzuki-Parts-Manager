@@ -168,10 +168,9 @@ if __name__ == "__main__":
     window.showMaximized()
     app.processEvents()
 
-    splash_message(app, splash, "Controleren op updates...")
-    maybe_check_for_updates(window)
-
     splash_message(app, splash, "Klaar met opstarten...")
     splash.finish(window)
+
+    maybe_check_for_updates(window)
 
     sys.exit(app.exec())
