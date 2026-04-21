@@ -533,7 +533,6 @@ class TabInboeken(QWidget):
         out_dir = self.engine.output_dir
         default_path = os.path.join(out_dir, default_name)
 
-
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Output opslaan",
@@ -543,9 +542,15 @@ class TabInboeken(QWidget):
         if not path:
             return
         try:
-            saved = self.engine.export_output(path)  # ✅ gebruik gekozen pad/naam
+            saved = self.engine.export_output(path)
+            self.engine.clear_autosave()
             self._log(f"OUTPUT | opgeslagen: {saved}")
-            QMessageBox.information(self, "Output opgeslagen", f"Opgeslagen:\n{saved}")
+            self._log("AUTOSAVE | gewist — volgende sessie begint schoon")
+            QMessageBox.information(
+                self,
+                "Output opgeslagen",
+                f"Opgeslagen:\n{saved}\n\nDe sessielijst is gewist. Je kunt weer vers beginnen."
+            )
         except Exception:
             QMessageBox.warning(self, "Opslaan mislukt", "Kan output niet opslaan.")
 

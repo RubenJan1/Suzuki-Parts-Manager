@@ -1,0 +1,91 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Versienummer uitlezen
+        id: version
+        shell: pwsh
+        run: |
+          $ver = python -c "exec(open('version.py').read()); print(APP_VERSION)"
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          echo "tag=v$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Controleer of release al bestaat
+        id: check
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view ${{ steps.version.outputs.tag }} 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            echo "exists=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Release ${{ steps.version.outputs.tag }} bestaat al — overgeslagen."
+          } else {
+            echo "exists=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Nieuwe release: ${{ steps.version.outputs.tag }}"
+          }
+
+      - name: Python instellen
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Dependencies installeren
+        if: steps.check.outputs.exists == 'false'
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Updater bouwen (updater.exe)
+        if: steps.check.outputs.exists == 'false'
+        run: pyinstaller --onefile --name updater --console updater.py
+
+      - name: Hoofdapp bouwen
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --name "Suzuki Parts Manager" `
+            --windowed `
+            --icon="assets/app_icon.ico" `
+            --add-data "assets;assets" `
+            --onedir `
+            main.py
+
+      - name: updater.exe kopiëren naar app-map
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        run: Copy-Item "dist\updater.exe" "dist\Suzuki Parts Manager\updater.exe"
+
+      - name: Zip aanmaken
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "dist\Suzuki Parts Manager" `
+            -DestinationPath "Suzuki.Parts.Manager.zip"
+
+      - name: GitHub Release aanmaken en zip uploaden
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.version.outputs.tag }} `
+            --title "Suzuki Parts Manager ${{ steps.version.outputs.tag }}" `
+            --notes "Automatische release van versie ${{ steps.version.outputs.tag }}." `
+            "Suzuki.Parts.Manager.zip"

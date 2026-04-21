@@ -1578,17 +1578,26 @@ class InboekenEngine:
 
 
 
-    def export_output(self, out_dir: str) -> str:
-          os.makedirs(out_dir, exist_ok=True)
+    def export_output(self, path: str) -> str:
+        path = str(path)
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        self.df.to_excel(path, index=False)
+        return path
 
-          ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-          uid = uuid.uuid4().hex[:6]
-
-          filename = f"inboeken_output_{ts}_{uid}.xlsx"
-          path = os.path.join(out_dir, filename)
-
-          self.df.to_excel(path, index=False)
-          return path
+    def clear_autosave(self) -> None:
+        """Wis autosave na output opslaan — herstart begint schoon."""
+        import glob as _glob
+        for folder in [self._autosave_dir, self._daily_autosave_dir]:
+            for f in _glob.glob(os.path.join(folder, "*.xlsx")):
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+        self.df = pd.DataFrame(columns=[
+            "ID", "Title", "Productcategorieën", "Stock", "Short Description",
+            "Locatie", "Prijs", "Prijs_orig", "Korting_pct",
+        ])
+        self._dirty = False
 
 
 
