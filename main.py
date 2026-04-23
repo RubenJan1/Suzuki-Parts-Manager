@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QLabel, QFileDialog, QMessageBox, QSplashScreen
 )
 from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtCore import QLockFile, Qt
+from PySide6.QtCore import QLockFile, Qt, QThread, Signal
 
 import pandas as pd
 
@@ -63,21 +63,23 @@ def splash_message(app: QApplication, splash: QSplashScreen, text: str):
     app.processEvents()
 
 
-def maybe_check_for_updates(parent=None):
-    info = check_github_release(
-        current_version=APP_VERSION,
-        github_owner=GITHUB_OWNER,
-        github_repo=GITHUB_REPO,
-        timeout_seconds=3,
-    )
+class _UpdateCheckThread(QThread):
+    update_found = Signal(object)
 
-    if info.error:
-        return
+    def run(self):
+        info = check_github_release(
+            current_version=APP_VERSION,
+            github_owner=GITHUB_OWNER,
+            github_repo=GITHUB_REPO,
+            timeout_seconds=5,
+        )
+        if not info.error and info.update_available:
+            self.update_found.emit(info)
 
-    if not info.update_available:
-        return
 
+def _show_update_dialog(parent, info):
     msg = QMessageBox(parent)
+    msg.setWindowFlags(msg.windowFlags() | Qt.WindowStaysOnTopHint)
     msg.setIcon(QMessageBox.Information)
     msg.setWindowTitle("Update beschikbaar")
     msg.setText(
@@ -85,7 +87,6 @@ def maybe_check_for_updates(parent=None):
         f"Huidige versie: {info.current_version}\n"
         f"Nieuwe versie: {info.latest_version}"
     )
-
     if info.asset_name:
         msg.setInformativeText(f"Downloadbestand: {info.asset_name}")
     else:
@@ -93,13 +94,21 @@ def maybe_check_for_updates(parent=None):
 
     btn_download = msg.addButton("Download", QMessageBox.AcceptRole)
     msg.addButton("Later", QMessageBox.RejectRole)
-
+    msg.raise_()
+    msg.activateWindow()
     msg.exec()
 
     if msg.clickedButton() == btn_download:
         target = info.download_url or info.release_url
         if target:
             run_updater(target)
+
+
+def start_update_check(parent):
+    thread = _UpdateCheckThread(parent)
+    thread.update_found.connect(lambda info: _show_update_dialog(parent, info))
+    thread.start()
+    return thread
 
 
 class MainWindow(QMainWindow):
@@ -170,7 +179,8 @@ if __name__ == "__main__":
 
     splash_message(app, splash, "Klaar met opstarten...")
     splash.finish(window)
+    app.processEvents()
 
-    maybe_check_for_updates(window)
+    _update_thread = start_update_check(window)
 
     sys.exit(app.exec())
