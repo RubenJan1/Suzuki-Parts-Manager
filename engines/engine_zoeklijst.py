@@ -313,3 +313,40 @@ class EngineZoeklijst:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         report_df.to_excel(out_path, index=False)
         return out_path
+
+    @staticmethod
+    def _is_uitverkocht(row: pd.Series) -> bool:
+        """Rij is uitverkocht/niet beschikbaar als Found=NO, of als stock <= 0."""
+        if str(row.get("Found", "")).strip().upper() == "NO":
+            return True
+        stock = str(row.get("Stock", "")).strip().replace(",", ".")
+        try:
+            return float(stock) <= 0
+        except ValueError:
+            return stock == ""
+
+    def export_report_xlsx_splits(self, report_df: pd.DataFrame, stem: str = "zoeklijst_report") -> dict:
+        """
+        Sla 3 varianten op:
+          {stem}_compleet.xlsx      — alles
+          {stem}_beschikbaar.xlsx   — zonder uitverkochte regels
+          {stem}_uitverkocht.xlsx   — alleen uitverkochte regels
+        Geeft een dict terug met keys 'compleet', 'beschikbaar', 'uitverkocht' en 'folder'.
+        """
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        mask_uit = report_df.apply(self._is_uitverkocht, axis=1)
+
+        paden = {}
+        voor = [
+            ("compleet",    report_df),
+            ("beschikbaar", report_df[~mask_uit]),
+            ("uitverkocht", report_df[mask_uit]),
+        ]
+        for label, df in voor:
+            pad = self.output_dir / f"{stem}_{label}.xlsx"
+            df.to_excel(pad, index=False)
+            paden[label] = pad
+
+        paden["folder"] = self.output_dir
+        return paden

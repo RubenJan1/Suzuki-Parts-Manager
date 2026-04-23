@@ -78,6 +78,8 @@ The category tree is hardcoded as JSON in both `engine_inboeken.py` and `engine_
 
 **Batch state** (`data/batch_state.json`): Tracks which Website 277 or other runs are `PENDING_IMPORT` / `IMPORTED` / `MERGED`. Managed by `services/batch_state.py`.
 
+**Website 277 – laatste stap**: Na het genereren van het output-bestand opent de tab automatisch de map (`%LOCALAPPDATA%\Suzuki Parts Manager\output\277\`) in Windows Verkenner via `os.startfile()`, zodat de gebruiker het bestand direct kan uploaden naar de website.
+
 ## File paths at runtime
 
 ```

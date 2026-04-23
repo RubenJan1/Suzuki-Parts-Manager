@@ -29,7 +29,8 @@ from utils.paths import output_root
 import os
 import re
 import math
-import datetime as _dt 
+import shutil
+import datetime as _dt
 from datetime import datetime
 import json
 import uuid
@@ -886,10 +887,16 @@ def normalize_part_number(s: str) -> str:
     return s
 
 
+def _nodash(s: str) -> str:
+    """Verwijder alle streepjes — voor vergelijking zonder streepjes."""
+    return s.replace("-", "")
+
+
 def _pn_candidates(pn: str) -> list[str]:
     """
     Maak zoekvarianten:
     - exact zoals ingevoerd
+    - zonder streepjes (09380-20007 → 0938020007 en andersom)
     - zonder '-000' (als aanwezig)
     - met '-000' (als afwezig)
     """
@@ -897,15 +904,18 @@ def _pn_candidates(pn: str) -> list[str]:
     if not pn:
         return []
 
-    out = {pn}
+    out = {pn, _nodash(pn)}
 
     # strip -000 suffix
     if re.search(r"-0{3}$", pn):
-        out.add(re.sub(r"-0{3}$", "", pn))
+        base = re.sub(r"-0{3}$", "", pn)
+        out.add(base)
+        out.add(_nodash(base))
 
     # add -000 suffix
     if not re.search(r"-\d{3}$", pn):
         out.add(pn + "-000")
+        out.add(_nodash(pn) + "000")
 
     return sorted(out)
 
@@ -1274,37 +1284,43 @@ class InboekenEngine:
     # -----------------------------
 
     def exact_title_hits(self, title: str, limit: int = SEARCH_LIMIT_DEFAULT) -> List[SearchHit]:
-        t = normalize_part_number(title)
+        t    = normalize_part_number(title)
+        t_nd = _nodash(t)
         if not t:
             return []
 
         hits: List[SearchHit] = []
 
         if not self.df.empty:
-            mask = self.df["Title"].astype(str).str.strip().str.upper().eq(t)
+            norm = self.df["Title"].astype(str).str.strip().str.upper()
+            mask = norm.eq(t) | norm.str.replace("-", "", regex=False).eq(t_nd)
             for _, r in self.df[mask].head(limit).iterrows():
                 hits.append(self._extract_hit_from_own_row(r))
 
         if not self.website_df.empty and len(hits) < limit:
             col = first_existing_col(self.website_df, "Naam", "Name", "Title", "post_title", "product_title", "title", "name", "SKU")
             if col:
-                mask = self.website_df[col].astype(str).str.strip().str.upper().eq(t)
+                norm = self.website_df[col].astype(str).str.strip().str.upper()
+                mask = norm.eq(t) | norm.str.replace("-", "", regex=False).eq(t_nd)
                 for _, r in self.website_df[mask].head(limit - len(hits)).iterrows():
                     hits.append(self._extract_hit_from_website_row(r))
 
         return hits
 
     def search(self, query: str, limit: int = SEARCH_LIMIT_DEFAULT) -> List[SearchHit]:
-        q = clean_text(query)
+        q    = clean_text(query)
         if not q:
             return []
+        q_nd = q.replace("-", "")   # variant zonder streepjes
 
         hits: List[SearchHit] = []
 
         # eigen lijst eerst
         if not self.df.empty:
+            titles = self.df["Title"].astype(str)
             mask = (
-                self.df["Title"].astype(str).str.contains(q, case=False, na=False) |
+                titles.str.contains(q, case=False, na=False) |
+                titles.str.replace("-", "", regex=False).str.contains(q_nd, case=False, na=False) |
                 self.df["Short Description"].astype(str).str.contains(q, case=False, na=False)
             )
             for _, r in self.df[mask].head(limit).iterrows():
@@ -1314,9 +1330,11 @@ class InboekenEngine:
             title_col = first_existing_col(self.website_df, "Naam", "Name", "Title", "post_title", "product_title", "title", "name", "SKU")
             short_col = first_existing_col(self.website_df, "Korte beschrijving", "Short Description", "short_description")
 
-            mask = pd.Series([False] * len(self.website_df))
+            mask = pd.Series([False] * len(self.website_df), index=self.website_df.index)
             if title_col:
-                mask |= self.website_df[title_col].astype(str).str.contains(q, case=False, na=False)
+                titles_w = self.website_df[title_col].astype(str)
+                mask |= titles_w.str.contains(q, case=False, na=False)
+                mask |= titles_w.str.replace("-", "", regex=False).str.contains(q_nd, case=False, na=False)
             if short_col:
                 mask |= self.website_df[short_col].astype(str).str.contains(q, case=False, na=False)
 
@@ -1587,6 +1605,21 @@ class InboekenEngine:
     def clear_autosave(self) -> None:
         """Wis autosave na output opslaan — herstart begint schoon."""
         import glob as _glob
+
+        # Bewaar de meest recente daily autosave als backup vóór wissen
+        try:
+            daily_files = sorted(
+                _glob.glob(os.path.join(self._daily_autosave_dir, "inboeken_*.xlsx")),
+                reverse=True,
+            )
+            if daily_files:
+                backup_dir = self.output_dir / "debug"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                shutil.copy2(daily_files[0], str(backup_dir / f"daily_autosave_backup_{ts}.xlsx"))
+        except Exception:
+            pass
+
         for folder in [self._autosave_dir, self._daily_autosave_dir]:
             for f in _glob.glob(os.path.join(folder, "*.xlsx")):
                 try:

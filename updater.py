@@ -31,7 +31,9 @@ def replace_files(src, dst):
 
 def main():
     if len(sys.argv) < 3:
-        log("FOUT: geen args")
+        print("Dit programma wordt automatisch gestart door Suzuki Parts Manager.")
+        print("Je hoeft het niet handmatig te openen.")
+        input("\nDruk op Enter om te sluiten...")
         return
 
     zip_path = sys.argv[1]

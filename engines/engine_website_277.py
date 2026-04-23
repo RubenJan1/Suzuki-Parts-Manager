@@ -1412,14 +1412,17 @@ class Website277Engine:
         # Output
         # ----------------------------------------------------
         rid = run_id()
-        OUT = output_root() / "277"
-        DEBUG = OUT / "DEBUG" / f"RUN_{rid}"
-        OUT.mkdir(parents=True, exist_ok=True)
-        DEBUG.mkdir(parents=True, exist_ok=True)
+        OUT        = output_root() / "277"
+        DIR_UPDATE = OUT / "website_update"
+        DIR_PICK   = OUT / "picklijsten"
+        DIR_TEKORT = OUT / "tekort"
+        DEBUG      = OUT / "DEBUG" / f"RUN_{rid}"
+
+        for d in [DIR_UPDATE, DIR_PICK, DEBUG]:
+            d.mkdir(parents=True, exist_ok=True)
 
         # debug: input kopieën
         try:
-            # WC-export pad heb je in app_state.wc_path
             if self.app_state.wc_path and os.path.exists(self.app_state.wc_path):
                 shutil.copy2(self.app_state.wc_path, str(DEBUG / f"INPUT_WC_{Path(self.app_state.wc_path).name}"))
             for i, src in enumerate(self.cms_paths, start=1):
@@ -1427,12 +1430,12 @@ class Website277Engine:
         except Exception:
             pass
 
-        # outputs
-        p_update = str(OUT / f"WEBSITE_UPDATE_277_{rid}.xlsx")
-        p_tekort = str(OUT / f"WEBSITE_TEKORT_277_{rid}.xlsx")
-        p_pick   = str(OUT / f"WEBSITE_PICKLIJST_277_{rid}.xlsx")
-        p_out    = str(DEBUG / f"WEBSITE_UITVERKOCHT_277_{rid}.xlsx")
-        p_stats  = str(DEBUG / f"RUN_STATS_{rid}.xlsx")
+        # outputpaden
+        p_update = str(DIR_UPDATE / f"WEBSITE_UPDATE_277_{rid}.xlsx")
+        p_pick   = str(DIR_PICK   / f"WEBSITE_PICKLIJST_277_{rid}.xlsx")
+        p_tekort = str(DIR_TEKORT / f"WEBSITE_TEKORT_277_{rid}.xlsx")
+        p_out    = str(DEBUG      / f"WEBSITE_UITVERKOCHT_277_{rid}.xlsx")
+        p_stats  = str(DEBUG      / f"RUN_STATS_{rid}.xlsx")
 
         upd_df = pd.DataFrame(
             updates,
@@ -1503,6 +1506,7 @@ class Website277Engine:
 
 
         if tekort_log:
+            DIR_TEKORT.mkdir(parents=True, exist_ok=True)
             pd.DataFrame(
                 tekort_log,
                 columns=[
@@ -1514,24 +1518,18 @@ class Website277Engine:
                     "Reden"
                 ]
             ).to_excel(p_tekort, index=False)
-
         else:
             p_tekort = None
 
         # ----------------------------
         # Run stats (controle)
         # ----------------------------
-        # aantal regels met tekort
         tekort_lines = len(tekort_log)
-
-        # voorbereidende variabelen voor stats/output paden
-        paths = []
         p_stats = None
 
         try:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             p_stats = str(DEBUG / f"RUN_STATS_{ts}.xlsx")
-
             stats = [
                 ["CMS bestanden", int(total_files)],
                 ["Orderregels (raw)", int(total_lines_raw)],
@@ -1542,18 +1540,28 @@ class Website277Engine:
                 ["Regels met tekort", int(tekort_lines)],
             ]
             pd.DataFrame(stats, columns=["Metric", "Value"]).to_excel(p_stats, index=False)
-            paths.append(p_stats)
         except Exception:
             pass
 
-        # Output paths
+        # Kopieer outputbestanden ook naar DEBUG voor volledig runarchief
+        for src_pad in [p_update, p_pick]:
+            try:
+                shutil.copy2(src_pad, str(DEBUG / Path(src_pad).name))
+            except Exception:
+                pass
+        if p_tekort:
+            try:
+                shutil.copy2(p_tekort, str(DEBUG / Path(p_tekort).name))
+            except Exception:
+                pass
+
         paths = [p_update, p_pick]
+        if p_tekort:
+            paths.append(p_tekort)
         if p_out:
             paths.append(p_out)
         if p_stats:
             paths.append(p_stats)
-        if tekort_log and p_tekort:
-            paths.append(p_tekort)
 
         return {
             "batch_id": rid,

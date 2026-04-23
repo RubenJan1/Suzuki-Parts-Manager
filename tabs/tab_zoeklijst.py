@@ -255,15 +255,31 @@ class TabZoeklijst(QWidget):
             QMessageBox.information(self, "Geen input", "Upload een XLSX of plak text en klik 'Parse'.")
             return
 
-        filename = (self.ed_filename.text() or "").strip() or "zoeklijst_report.xlsx"
-        if not filename.lower().endswith(".xlsx"):
-            filename += ".xlsx"
+        stem = (self.ed_filename.text() or "").strip()
+        if stem.lower().endswith(".xlsx"):
+            stem = stem[:-5]
+        if not stem:
+            stem = "zoeklijst_report"
 
         report = self.engine.build_report(self._parts)
         try:
-            out_path = self.engine.export_report_xlsx(report, filename=filename)
-            self._last_output_path = out_path
-            QMessageBox.information(self, "Klaar", f"Report opgeslagen:\n{out_path}")
+            paden = self.engine.export_report_xlsx_splits(report, stem=stem)
+            self._last_output_path = paden["compleet"]
+
+            # Open de outputmap zodat de bestanden direct zichtbaar zijn
+            import os as _os
+            try:
+                _os.startfile(str(paden["folder"]))
+            except Exception:
+                pass
+
+            QMessageBox.information(
+                self, "Klaar",
+                f"3 bestanden opgeslagen in:\n{paden['folder']}\n\n"
+                f"📄  {paden['compleet'].name}\n"
+                f"✅  {paden['beschikbaar'].name}\n"
+                f"❌  {paden['uitverkocht'].name}"
+            )
         except Exception as e:
             QMessageBox.critical(self, "Opslaan fout", str(e))
 
