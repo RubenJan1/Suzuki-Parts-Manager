@@ -8,7 +8,11 @@
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:github.com)",
       "Bash(git -C \"C:\\\\Users\\\\ruben\\\\Documents\\\\GitHub\\\\Suzuki-Parts-Manager\" log --oneline -5)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(python -c ' *)",
+      "WebSearch",
+      "WebFetch(domain:www.cmsnl.com)",
+      "WebFetch(domain:www.partzilla.com)"
     ]
   }
 }
