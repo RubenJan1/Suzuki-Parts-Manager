@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh release *)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(git -C \"C:\\\\Users\\\\ruben\\\\Documents\\\\GitHub\\\\Suzuki-Parts-Manager\" log --oneline -5)",
+      "Bash(git *)"
+    ]
+  }
+}
