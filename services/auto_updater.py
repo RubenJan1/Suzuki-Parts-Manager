@@ -21,7 +21,8 @@ def run_updater(download_url):
     subprocess.Popen([
         updater_path,
         zip_path,
-        app_dir
+        app_dir,
+        str(os.getpid()),
     ])
 
     sys.exit(0)

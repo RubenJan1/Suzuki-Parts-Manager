@@ -7,9 +7,16 @@ import zipfile
 def log(msg):
     print("[UPDATER]", msg)
 
-def wait_for_app_to_close(app_path):
-    log("Wachten tot app sluit...")
-    time.sleep(2)
+def wait_for_app_to_close(pid: int):
+    log(f"Wachten tot app sluit (PID {pid})...")
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    SYNCHRONIZE = 0x00100000
+    handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+    if handle:
+        kernel32.WaitForSingleObject(handle, 30000)  # max 30 sec
+        kernel32.CloseHandle(handle)
+    time.sleep(1)
 
 def extract_zip(zip_path, extract_to):
     log("Uitpakken...")
@@ -38,6 +45,7 @@ def main():
 
     zip_path = sys.argv[1]
     app_dir = sys.argv[2]
+    pid = int(sys.argv[3]) if len(sys.argv) > 3 else None
 
     temp_dir = os.path.join(app_dir, "_update_tmp")
 
@@ -46,7 +54,10 @@ def main():
 
     os.makedirs(temp_dir)
 
-    wait_for_app_to_close(app_dir)
+    if pid:
+        wait_for_app_to_close(pid)
+    else:
+        time.sleep(3)
 
     extract_zip(zip_path, temp_dir)
 
