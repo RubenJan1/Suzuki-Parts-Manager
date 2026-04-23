@@ -124,6 +124,12 @@ class TabInboeken(QWidget):
         self._install_solid_context_menus()
         self._refresh_validation()
 
+        try:
+            from services.superseded import preload_async
+            preload_async()
+        except Exception:
+            pass
+
     def _clean_text(self, value) -> str:
         if value is None:
             return ""
@@ -769,7 +775,14 @@ class TabInboeken(QWidget):
         if not hits:
             st = self.engine.not_found_status(q)
             self._log(f"NIET GEVONDEN | {q} | website={st['in_web']} eigen={st['in_own']}")
+            sup_hits = self._search_via_superseded(q)
+            if sup_hits:
+                chosen = self._choose_from_hits(sup_hits, title=f"Superseded nummer gevonden voor: {q} ({len(sup_hits)})")
+                if chosen:
+                    self._apply_hit(chosen)
+                return
             QMessageBox.information(self, "Zoek", f"Niets gevonden voor: {q}")
+            self._fill_superseded()
             return
 
         chosen = self._choose_from_hits(hits, title=f"Zoekresultaten ({len(hits)})")
@@ -821,7 +834,46 @@ class TabInboeken(QWidget):
         self._sync_tree_checks()
         self._update_selected_label()
         self._log(f"GELADEN | {data.get('Title','')} ({data.get('Source','')})")
+        self._fill_superseded()
         self._refresh_validation()
+
+    def _fill_superseded(self):
+        """Zoek superseded nummers op voor de huidige titel en vul de korte beschrijving aan."""
+        try:
+            from services.superseded import lookup_superseded
+            title = (self.ed_title.text() or "").strip()
+            if not title:
+                return
+            related = lookup_superseded(title)
+            if not related:
+                return
+            superseded_line = "Superseded to: " + ", ".join(related)
+            current = (self.ed_desc.toPlainText() or "").strip()
+            lines = [l for l in current.splitlines() if not l.strip().startswith("Superseded to:")]
+            lines = [l for l in lines if l.strip()]
+            new_desc = "\n".join(lines + [superseded_line]) if lines else superseded_line
+            self.ed_desc.setPlainText(new_desc)
+        except Exception:
+            pass
+
+    def _search_via_superseded(self, q: str) -> list:
+        """Zoek via superseded nummers in de WC export als het originele nummer niet gevonden wordt."""
+        try:
+            from services.superseded import lookup_superseded
+            related = lookup_superseded(q)
+            if not related:
+                return []
+            hits = []
+            seen = set()
+            for num in related:
+                for hit in self.engine.exact_title_hits(num, limit=SEARCH_LIMIT):
+                    key = (getattr(hit, "source", ""), getattr(hit, "title", ""))
+                    if key not in seen:
+                        seen.add(key)
+                        hits.append(hit)
+            return hits
+        except Exception:
+            return []
 
     # ------------- Save -------------
 

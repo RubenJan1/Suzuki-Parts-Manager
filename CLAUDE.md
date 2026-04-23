@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Suzuki Parts Manager is a PySide6 desktop application for **Vlaandere Motoren** (a Suzuki motorcycle parts dealer in Bolsward, NL). It manages parts inventory, generates WP All Import–ready Excel files, processes CMS orders, and produces PDF invoices.
 
-The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.0.1` (see `version.py`).
+The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.0.10` (see `version.py`).
 
 ## Running the app
 
@@ -34,7 +34,7 @@ PySide6, pandas, openpyxl, reportlab, Pillow
 | UI (tabs) | `tabs/tab_*.py` | PySide6 QWidget, calls engines, shows results |
 | Business logic | `engines/engine_*.py` | Pure data processing, no UI dependencies |
 | Shared state | `app_state.py` | `AppState` singleton passed to all tabs |
-| Services | `services/` | Update checker, batch state, auto-updater |
+| Services | `services/` | Update checker, batch state, auto-updater, superseded lookup |
 | Utils | `utils/` | Paths, theming, helpers |
 
 ### AppState
@@ -77,6 +77,8 @@ The category tree is hardcoded as JSON in both `engine_inboeken.py` and `engine_
 **TLC (internal stock list)**: Maintained as `TLC_1.xlsx` (no headers, columns: Title, Stock, Prijs, Locatie) inside a structured folder. The engine makes automatic backups before each run.
 
 **Batch state** (`data/batch_state.json`): Tracks which Website 277 or other runs are `PENDING_IMPORT` / `IMPORTED` / `MERGED`. Managed by `services/batch_state.py`.
+
+**Superseded nummers**: Suzuki onderdeelnummers bestaan in families (oud/nieuw model, ander jaar). `services/superseded.py` bouwt een lazy index vanuit `assets/Superseded lijst.xls` (kolom AJ = canoniek ALT-nummer, kolommen R1–R17 en U1–U9 = verwante nummers). `lookup_superseded(part_number)` geeft alle gerelateerde nummers gesorteerd terug, zonder `-000` suffix. De Inboeken-tab laadt de index alvast in de achtergrond via `preload_async()` bij opstarten. Bij zoeken wordt de korte beschrijving automatisch aangevuld met een `Superseded to: ...` regel; als een artikelnummer niet direct gevonden wordt, zoekt de tab alsnog via superseded nummers in de WC export.
 
 **Website 277 – laatste stap**: Na het genereren van het output-bestand opent de tab automatisch de map (`%LOCALAPPDATA%\Suzuki Parts Manager\output\277\`) in Windows Verkenner via `os.startfile()`, zodat de gebruiker het bestand direct kan uploaden naar de website.
 
