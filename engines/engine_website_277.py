@@ -1059,6 +1059,7 @@ class Website277Engine:
     def __init__(self, app_state):
         self.app_state = app_state
         self.cms_paths = []
+        self.last_invoice_lines: list = []
 
     # --------------------------------------------------------
     # INPUT
@@ -1073,6 +1074,7 @@ class Website277Engine:
     # RUN
     # --------------------------------------------------------
     def run(self):
+        self.last_invoice_lines = []
         if self.app_state.wc_df is None:
             raise RuntimeError("Geen WC-export geladen")
         if not self.cms_paths:
@@ -1383,6 +1385,15 @@ class Website277Engine:
                 r["Factuur"],
                 opm
             ])
+            if geleverd > 0:
+                self.last_invoice_lines.append({
+                    "title": title,
+                    "omschrijving": str(r["Omschrijving"]),
+                    "besteld": int(qty),
+                    "geleverd": int(geleverd),
+                    "prijs": float(r["Prijs"]) if r["Prijs"] else 0.0,
+                    "factuurnummer": str(r["Factuur"]),
+                })
             # ---- Uitverkocht debug (277) ----
             # Let op: hier willen we wél de echte prijs/locatie zien, ook al maken we ze leeg in het UPDATE-bestand.
             if stock_oud == 0 or (stock_oud > 0 and nieuw_stock == 0) or (geleverd < qty):

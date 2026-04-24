@@ -42,8 +42,125 @@ class TabFactuurmaker(QWidget):
         super().__init__()
         self.app_state = app_state
         self.engine = FactuurMakerEngine()
+        self._loaded_bron: str | None = None
         self._build_ui()
         self._validate_form()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._refresh_banner()
+
+    def _maak_cms_banner(self) -> QFrame:
+        frame = QFrame()
+        frame.setObjectName("cms_banner")
+        frame.setStyleSheet("""
+            QFrame#cms_banner {
+                background: rgba(234,88,12,0.12);
+                border: 2px solid #ea580c;
+                border-radius: 10px;
+            }
+        """)
+        lay = QVBoxLayout(frame)
+        lay.setContentsMargins(16, 12, 16, 12)
+        lay.setSpacing(10)
+
+        self.banner_lbl = QLabel()
+        self.banner_lbl.setWordWrap(True)
+        self.banner_lbl.setStyleSheet(
+            "font-size: 13px; font-weight: bold; color: #9a3412;"
+            "background: transparent; border: none;"
+        )
+        lay.addWidget(self.banner_lbl)
+
+        rij = QHBoxLayout()
+        self.btn_laad_277 = QPushButton("Laad 277-orders in factuur")
+        self.btn_laad_277.setObjectName("primary")
+        self.btn_laad_277.setMinimumHeight(40)
+        self.btn_laad_277.clicked.connect(lambda: self._laad_uit_queue("277"))
+
+        self.btn_laad_1322 = QPushButton("Laad 1322-orders in factuur")
+        self.btn_laad_1322.setObjectName("primary")
+        self.btn_laad_1322.setMinimumHeight(40)
+        self.btn_laad_1322.clicked.connect(lambda: self._laad_uit_queue("1322"))
+
+        rij.addWidget(self.btn_laad_277)
+        rij.addWidget(self.btn_laad_1322)
+        rij.addStretch()
+        lay.addLayout(rij)
+
+        frame.hide()
+        return frame
+
+    def _refresh_banner(self):
+        try:
+            from services.cms_queue import pending_counts, pending_factuurnummers, has_pending
+            counts = pending_counts()
+            n277   = counts.get("277", 0)
+            n1322  = counts.get("1322", 0)
+
+            if n277 == 0 and n1322 == 0:
+                self.banner_cms.hide()
+                return
+
+            delen = []
+            if n277 > 0:
+                fnrs = pending_factuurnummers("277")
+                fnr_str = ", ".join(fnrs[:5]) + (" ..." if len(fnrs) > 5 else "")
+                delen.append(f"277: {n277} regel(s)  —  ordernr: {fnr_str}")
+            if n1322 > 0:
+                fnrs = pending_factuurnummers("1322")
+                fnr_str = ", ".join(fnrs[:5]) + (" ..." if len(fnrs) > 5 else "")
+                delen.append(f"1322: {n1322} regel(s)  —  ordernr: {fnr_str}")
+
+            self.banner_lbl.setText(
+                "⚠️  Er staan CMS-orders klaar voor facturering:\n\n"
+                + "\n".join(delen)
+                + "\n\nKlik hieronder op de juiste knop om de orders te laden."
+            )
+            self.btn_laad_277.setEnabled(n277 > 0)
+            self.btn_laad_1322.setEnabled(n1322 > 0)
+            self.banner_cms.show()
+        except Exception:
+            self.banner_cms.hide()
+
+    def _laad_uit_queue(self, bron: str):
+        try:
+            from services.cms_queue import get_pending
+            import pandas as pd
+            entries = get_pending(bron)
+            if not entries:
+                return
+
+            regels = []
+            for entry in entries:
+                for r in entry.get("regels", []):
+                    regels.append({
+                        "Artikel":      r.get("title", ""),
+                        "Omschrijving": r.get("omschrijving", ""),
+                        "Aantal":       int(r.get("geleverd", 0)),
+                        "Prijs":        float(r.get("prijs", 0.0)),
+                    })
+
+            if not regels:
+                return
+
+            df = pd.DataFrame(regels)
+            df["Aantal"] = pd.to_numeric(df["Aantal"], errors="coerce").fillna(0).astype(int)
+            df["Prijs"]  = pd.to_numeric(df["Prijs"],  errors="coerce").fillna(0.0).astype(float)
+
+            self.engine.clear_bestellingen()
+            self.engine.work_df = df
+            self.engine.merge_work_df()
+            self.engine.sort_work_df()
+
+            self._loaded_bron = bron
+            self.refresh_preview()
+            self._validate_form()
+            self.lbl_status.setText(
+                f"{len(regels)} regel(s) geladen uit {bron}-queue"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Fout", f"Kan orders niet laden:\n{e}")
 
     def _build_ui(self):
         apply_theme(self)
@@ -58,6 +175,12 @@ class TabFactuurmaker(QWidget):
         title = QLabel("Factuurmaker")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
         root.addWidget(title)
+
+        # =========================
+        # CMS WEEKFACTUUR BANNER
+        # =========================
+        self.banner_cms = self._maak_cms_banner()
+        root.addWidget(self.banner_cms)
 
         # =========================
         # TYPE EERST KIEZEN
@@ -570,7 +693,26 @@ class TabFactuurmaker(QWidget):
             QMessageBox.critical(self, "Error", str(e))
             return
 
-        QMessageBox.information(self, "Document created", f"PDF generated:\n{path}")
+        QMessageBox.information(self, "Document aangemaakt", f"PDF opgeslagen:\n{path}")
+
+        # Vraag om queue te markeren als verwerkt
+        if self._loaded_bron:
+            antw = QMessageBox.question(
+                self,
+                "Orders verwerkt?",
+                f"Wil je de {self._loaded_bron}-orders markeren als verwerkt?\n\n"
+                "Ze verdwijnen dan uit de lijst voor de weekfactuur.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if antw == QMessageBox.Yes:
+                try:
+                    from services.cms_queue import mark_verwerkt
+                    mark_verwerkt(self._loaded_bron)
+                except Exception:
+                    pass
+                self._loaded_bron = None
+                self._refresh_banner()
 
     def on_open_output(self):
         folder = output_root() / "facturen"

@@ -511,6 +511,15 @@ class TabWebsite277(QWidget):
         if self._update_path and os.path.exists(self._update_path):
             self._laad_update_tabel(self._update_path)
 
+        # Auto-save naar CMS weekfactuur queue
+        try:
+            from services.cms_queue import add_run
+            lines = getattr(self.engine, "last_invoice_lines", [])
+            if lines:
+                add_run("277", lines)
+        except Exception:
+            pass
+
         self._zet_staat(self.S_AFGEBOEKT)
 
         QMessageBox.information(

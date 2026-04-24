@@ -215,14 +215,12 @@ def euro(x):
 # ------------------------------------------------------------
 class TLC1322Engine:
     def __init__(self):
-        # --- NEW: vaste rootmap voor waterproof systeem ---
         self.base_dir = None
         self.tlc_filename = "TLC_1.xlsx"
-
-        # (oude velden)
-        self.tlc_path = None          # houden we voor backward compat, maar we gebruiken 'm niet meer
+        self.tlc_path = None
         self.cms_paths = []
-        self.wc_df = None  # optioneel: WC-export voor categorie/model lookup
+        self.wc_df = None
+        self.last_invoice_lines: list = []
 
 
     def set_tlc_path(self, path):
@@ -293,6 +291,7 @@ class TLC1322Engine:
     # RUN
     # --------------------------------------------------------
     def run(self):
+        self.last_invoice_lines = []
         if not self.cms_paths:
             raise RuntimeError("Geen CMS 1322-bestellingen geladen")
 
@@ -545,6 +544,15 @@ class TLC1322Engine:
                 title, oms, gevraagd, geleverd_total, stock_oud_total, nieuw_total,
                 loc_used, loc_all, euro(float(first_price or 0.0)), factuur, opm
             ])
+            if geleverd_total > 0:
+                self.last_invoice_lines.append({
+                    "title": title,
+                    "omschrijving": str(oms),
+                    "besteld": int(gevraagd),
+                    "geleverd": int(geleverd_total),
+                    "prijs": float(first_price or 0.0),
+                    "factuurnummer": str(factuur),
+                })
 
 
             # ---- Uitverkocht debug ----
