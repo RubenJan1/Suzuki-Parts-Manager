@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import pandas as pd
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -45,6 +45,20 @@ class TabFactuurmaker(QWidget):
         self.engine = FactuurMakerEngine()
         self._loaded_bron: str | None = None
         self._build_ui()
+        # Vul standaardwaarden in nadat de widget volledig gerenderd is.
+        # QTimer.singleShot(0) garandeert dat setPlainText pas na de paint-cyclus
+        # wordt aangeroepen — dit voorkomt dat tekst niet "plakt" in QTextEdit op
+        # sommige Windows-configuraties.
+        QTimer.singleShot(0, self._vul_standaard_adres)
+
+    def _vul_standaard_adres(self):
+        """Vul Bill to en Billing address in met standaardwaarden als ze leeg zijn."""
+        if not self.txt_billto.text().strip():
+            self.txt_billto.setText(self.engine.bill_to)
+        if not self.txt_address.toPlainText().strip():
+            self.txt_address.blockSignals(True)
+            self.txt_address.setPlainText(self.engine.billing_address)
+            self.txt_address.blockSignals(False)
         self._validate_form()
 
     def showEvent(self, event):
@@ -322,7 +336,6 @@ class TabFactuurmaker(QWidget):
         self.txt_billto = QLineEdit(self.engine.bill_to)
 
         self.txt_address = QTextEdit()
-        self.txt_address.setPlainText(self.engine.billing_address)
         self.txt_address.setFixedHeight(72)
 
         form.addWidget(QLabel("Factuurnummer"), 0, 0)
@@ -608,16 +621,26 @@ class TabFactuurmaker(QWidget):
         if self.engine.work_df is None or self.engine.work_df.empty:
             errors.append("Geen regels (producten) geladen")
 
-        preview_errors, preview_warnings = self._preview_issues()
+        # ===== Totaal check
+        try:
+            df = self.engine.work_df
+            if df is not None and not df.empty:
+                total = (df["Aantal"] * df["Prijs"]).sum() + self.engine.verzendkosten
+                if abs(total) < 0.01:
+                    errors.append("Totaal is 0.00")
+        except Exception:
+            pass
 
+        preview_errors, preview_warnings = self._preview_issues()
         if preview_errors:
             errors.append(f"{len(preview_errors)} foutieve previewregel(s)")
             errors.extend(preview_errors[:2])
 
-        # warnings alleen tonen, niet blokkeren
         warning_text = ""
         if preview_warnings:
             warning_text = "\n⚠️ Waarschuwingen:\n- " + "\n- ".join(preview_warnings[:2])
+
+        # ===== Resultaat (één keer instellen)
         if errors:
             self.lbl_validation.setText(
                 "❌ Niet klaar:\n- " + "\n- ".join(errors) + warning_text
@@ -633,52 +656,8 @@ class TabFactuurmaker(QWidget):
                 }
             """)
             self.btn_generate.setEnabled(False)
-
         else:
-            text = "✅ Klaar om te genereren"
-            if preview_warnings:
-                text += warning_text
-
-            self.lbl_validation.setText(text)
-
-            self.lbl_validation.setStyleSheet("""
-                QLabel {
-                    background: rgba(0, 150, 0, 0.08);
-                    border: 1px solid rgba(0, 150, 0, 0.4);
-                    border-radius: 8px;
-                    padding: 10px;
-                    font-weight: bold;
-                    color: #006600;
-                }
-            """)
-            self.btn_generate.setEnabled(True)
-
-        # ===== Totaal check (optioneel maar sterk)
-        try:
-            df = self.engine.work_df
-            if df is not None and not df.empty:
-                total = (df["Aantal"] * df["Prijs"]).sum() + self.engine.verzendkosten
-                if abs(total) < 0.01:
-                    errors.append("Totaal is 0.00")
-        except Exception:
-            pass
-
-        # ===== RESULTAAT
-        if errors:
-            self.lbl_validation.setText("❌ Niet klaar:\n- " + "\n- ".join(errors))
-            self.lbl_validation.setStyleSheet("""
-                QLabel {
-                    background: rgba(255, 0, 0, 0.08);
-                    border: 1px solid rgba(255, 0, 0, 0.4);
-                    border-radius: 8px;
-                    padding: 10px;
-                    font-weight: bold;
-                    color: #a00000;
-                }
-            """)
-            self.btn_generate.setEnabled(False)
-        else:
-            self.lbl_validation.setText("✅ Klaar om te genereren")
+            self.lbl_validation.setText("✅ Klaar om te genereren" + warning_text)
             self.lbl_validation.setStyleSheet("""
                 QLabel {
                     background: rgba(0, 150, 0, 0.08);
