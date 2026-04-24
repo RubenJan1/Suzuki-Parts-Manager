@@ -2,9 +2,12 @@ import urllib.request
 import os
 import subprocess
 import sys
+import zipfile
+
 
 def download_file(url, dest):
     urllib.request.urlretrieve(url, dest)
+
 
 def run_updater(download_url):
     app_dir = os.path.dirname(sys.executable)
@@ -14,9 +17,23 @@ def run_updater(download_url):
     os.makedirs(download_dir, exist_ok=True)
 
     zip_path = os.path.join(download_dir, "update.zip")
-    updater_path = os.path.join(app_dir, "updater.exe")
 
     download_file(download_url, zip_path)
+
+    # Gebruik de NIEUWE updater.exe uit de gedownloade zip.
+    # Dit voorkomt dat een verouderde bundeled updater.exe draait bij updates.
+    updater_path = os.path.join(app_dir, "updater.exe")  # fallback: huidige versie
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            # updater.exe zit in de zip op: <map>/updater.exe
+            entries = [n for n in zf.namelist() if n.endswith("/updater.exe") or n == "updater.exe"]
+            if entries:
+                new_updater_path = os.path.join(download_dir, "updater_new.exe")
+                with zf.open(entries[0]) as src, open(new_updater_path, "wb") as dst:
+                    dst.write(src.read())
+                updater_path = new_updater_path
+    except Exception:
+        pass  # bij fout: val terug op de bundeled updater.exe
 
     subprocess.Popen([
         updater_path,
