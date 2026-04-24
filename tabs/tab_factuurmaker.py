@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QTextEdit,
     QRadioButton, QComboBox, QDoubleSpinBox,
     QTableWidget, QHeaderView, QSizePolicy,
-    QGroupBox, QButtonGroup, QTableWidgetItem, QMessageBox, QFileDialog
+    QGroupBox, QButtonGroup, QTableWidgetItem, QMessageBox, QFileDialog,
+    QScrollArea, QFrame,
 )
 
 from engines.engine_factuurmaker import FactuurMakerEngine
@@ -162,6 +163,16 @@ class TabFactuurmaker(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Fout", f"Kan orders niet laden:\n{e}")
 
+    @staticmethod
+    def _pas_tabel_hoogte_aan(tabel: QTableWidget):
+        hoogte = (
+            tabel.horizontalHeader().height()
+            + tabel.verticalHeader().length()
+            + tabel.frameWidth() * 2
+            + 4
+        )
+        tabel.setFixedHeight(max(hoogte, 80))
+
     def _build_ui(self):
         apply_theme(self)
 
@@ -170,17 +181,35 @@ class TabFactuurmaker(QWidget):
         root.setSpacing(10)
 
         # =========================
-        # TITEL
+        # TITEL (vast, buiten scroll)
         # =========================
         title = QLabel("Factuurmaker")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
         root.addWidget(title)
 
         # =========================
-        # CMS WEEKFACTUUR BANNER
+        # CMS WEEKFACTUUR BANNER (vast, buiten scroll)
         # =========================
         self.banner_cms = self._maak_cms_banner()
         root.addWidget(self.banner_cms)
+
+        # Scroll area voor de rest
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        content = QWidget()
+        content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        vbox = QVBoxLayout(content)
+        vbox.setContentsMargins(0, 0, 4, 0)
+        vbox.setSpacing(10)
+
+        scroll.setWidget(content)
+        root.addWidget(scroll, stretch=1)
+
+        # Alias zodat de rest van _build_ui gewoon 'root' kan blijven gebruiken
+        root = vbox
 
         # =========================
         # TYPE EERST KIEZEN
@@ -324,14 +353,13 @@ class TabFactuurmaker(QWidget):
         box_preview_l.addWidget(self.txt_search)
 
         self.table = QTableWidget(0, 5)
-        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
         self.table.itemChanged.connect(self.on_table_edited)
         self.table.setHorizontalHeaderLabels(["Part Number", "Description", "Qty", "Price", "Total"])
         self.table.setAlternatingRowColors(True)
-        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.table.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
         self.table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
         self.table.verticalHeader().setDefaultSectionSize(28)
 
@@ -342,7 +370,7 @@ class TabFactuurmaker(QWidget):
         hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)
 
-        box_preview_l.addWidget(self.table, stretch=1)
+        box_preview_l.addWidget(self.table)
 
         row_edit = QHBoxLayout()
 
@@ -647,6 +675,7 @@ class TabFactuurmaker(QWidget):
 
         self.table.blockSignals(False)
         self.on_search_changed(self.txt_search.text())
+        self._pas_tabel_hoogte_aan(self.table)
 
     def _parse_float_eu(self, s: str) -> float:
         s = (s or "").strip().replace("€", "").strip()

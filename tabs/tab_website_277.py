@@ -561,10 +561,8 @@ class TabWebsite277(QWidget):
             item_s = QTableWidgetItem(stock)
 
             item_l = QTableWidgetItem(loc)
-            item_l.setFlags(item_l.flags() & ~Qt.ItemIsEditable)
 
             item_p = QTableWidgetItem(f"€ {prijs}" if prijs else "")
-            item_p.setFlags(item_p.flags() & ~Qt.ItemIsEditable)
 
             self.tbl_update.setItem(i, 0, item_t)
             self.tbl_update.setItem(i, 1, item_s)
@@ -593,19 +591,38 @@ class TabWebsite277(QWidget):
         try:
             df = pd.read_excel(self._update_path, dtype=str).fillna("")
             _cols = getattr(self, "_update_df_kolommen", ("Title", "Stock", "Locatie", None))
-            col_title, col_stock = _cols[0], _cols[1]
+            col_title = _cols[0]
+            col_stock = _cols[1]
+            col_loc   = _cols[2] if len(_cols) > 2 else None
+            col_prijs = _cols[3] if len(_cols) > 3 else None
 
-            if col_stock in df.columns and col_title in df.columns:
+            if col_title in df.columns:
                 title_to_stock = {}
+                title_to_loc   = {}
+                title_to_prijs = {}
                 for rij in range(self.tbl_update.rowCount()):
                     t_item = self.tbl_update.item(rij, 0)
                     s_item = self.tbl_update.item(rij, 1)
-                    if t_item and s_item:
-                        title_to_stock[t_item.text()] = s_item.text()
+                    l_item = self.tbl_update.item(rij, 2)
+                    p_item = self.tbl_update.item(rij, 3)
+                    if not t_item:
+                        continue
+                    title = t_item.text()
+                    if s_item:
+                        title_to_stock[title] = s_item.text()
+                    if l_item:
+                        title_to_loc[title] = l_item.text()
+                    if p_item:
+                        title_to_prijs[title] = p_item.text().replace("€", "").strip()
+
                 for idx in df.index:
                     title = str(df.at[idx, col_title])
-                    if title in title_to_stock:
+                    if col_stock and col_stock in df.columns and title in title_to_stock:
                         df.at[idx, col_stock] = title_to_stock[title]
+                    if col_loc and col_loc in df.columns and title in title_to_loc:
+                        df.at[idx, col_loc] = title_to_loc[title]
+                    if col_prijs and col_prijs in df.columns and title in title_to_prijs:
+                        df.at[idx, col_prijs] = title_to_prijs[title]
 
             df.to_excel(self._update_path, index=False)
 
