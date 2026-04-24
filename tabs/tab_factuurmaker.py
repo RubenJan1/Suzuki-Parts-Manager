@@ -325,7 +325,7 @@ class TabFactuurmaker(QWidget):
         self.txt_address.setPlainText(self.engine.billing_address)
         self.txt_address.setFixedHeight(72)
 
-        form.addWidget(QLabel("Documentnummer"), 0, 0)
+        form.addWidget(QLabel("Factuurnummer"), 0, 0)
         form.addWidget(self.txt_invoice, 0, 1)
         self.txt_original_invoice.textChanged.connect(self._validate_form)
 

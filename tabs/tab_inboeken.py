@@ -27,7 +27,8 @@ from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton, QFileDialog,
     QMessageBox, QTreeWidget, QTreeWidgetItem, QSplitter, QDialog, QTableWidget,
-    QTableWidgetItem, QAbstractItemView, QHeaderView, QGroupBox, QMenu
+    QTableWidgetItem, QAbstractItemView, QHeaderView, QGroupBox, QMenu,
+    QScrollArea, QFrame, QSizePolicy,
 )
 
 from engines.engine_inboeken import InboekenEngine, SearchHit, CATEGORIES_TREE, parse_price, round_up_to_5cent
@@ -289,11 +290,13 @@ class TabInboeken(QWidget):
 
         # ======================================================
         # RECHTS — PRODUCTGEGEVENS + ACTIES + EXTRA + LOG
+        # Gewikkeld in QScrollArea zodat kleinere schermen verticaal kunnen scrollen
         # ======================================================
-        right = QWidget()
-        rl = QVBoxLayout(right)
+        right_content = QWidget()
+        right_content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        rl = QVBoxLayout(right_content)
         rl.setSpacing(10)
-        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setContentsMargins(0, 0, 4, 0)
 
         # -------------------------
         # Productgegevens
@@ -441,7 +444,13 @@ class TabInboeken(QWidget):
         self.log.setMinimumHeight(120)
         rl.addWidget(self.log)
 
-        splitter.addWidget(right)
+        # Wrap rechts in scroll area
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setFrameShape(QFrame.NoFrame)
+        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        right_scroll.setWidget(right_content)
+        splitter.addWidget(right_scroll)
 
         # Verhoudingen: links voldoende ruimte voor zoeken + categorieën
         splitter.setStretchFactor(0, 1)
