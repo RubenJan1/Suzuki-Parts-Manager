@@ -258,6 +258,32 @@ class FactuurMakerEngine:
         self._save_sequence(seq)
         return f"{prefix}-{year}-{n:06d}"
 
+    def next_cms_document_number(self, bron: str) -> tuple[str, str]:
+        """
+        Genereer het volgende CMS-factuurnummer en leveranciersnummer.
+
+        Formaat 277:  {JJ}{N}   → bijv. 2617  (jaar 26, nr 17)
+        Formaat 1322: {JJ}0{N}  → bijv. 26017 (nul onderscheidt de twee reeksen)
+
+        Beide delen dezelfde jaarlijkse teller (CMS-{YEAR} in sequence.json).
+        Bootstrap: start op 16 als de teller nog niet bestaat
+        (facturen 1-16 zijn buiten de app aangemaakt).
+
+        Geeft tuple (documentnummer, cms_nummer) terug.
+        """
+        yy   = datetime.now().strftime("%y")    # "26" voor 2026
+        year = datetime.now().strftime("%Y")     # "2026"
+        seq  = self._load_sequence()
+        key  = f"CMS-{year}"
+        n    = int(seq.get(key, 16)) + 1        # bootstrap = 16
+        seq[key] = n
+        self._save_sequence(seq)
+
+        if bron == "1322":
+            return f"{yy}0{n}", "1322"
+        else:
+            return f"{yy}{n}", "277"
+
     def _ensure_document_number(self) -> None:
         """
         If invoice_number is empty, auto-number.

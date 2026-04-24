@@ -155,10 +155,16 @@ class TabFactuurmaker(QWidget):
             self.engine.sort_work_df()
 
             self._loaded_bron = bron
+
+            # Automatisch factuurnummer + CMS-nummer invullen
+            doc_nr, cms_nr = self.engine.next_cms_document_number(bron)
+            self.txt_invoice.setText(doc_nr)
+            self.txt_supplier.setText(cms_nr)
+
             self.refresh_preview()
             self._validate_form()
             self.lbl_status.setText(
-                f"{len(regels)} regel(s) geladen uit {bron}-queue"
+                f"{len(regels)} regel(s) geladen uit {bron}-queue  —  nr. {doc_nr}"
             )
         except Exception as e:
             QMessageBox.critical(self, "Fout", f"Kan orders niet laden:\n{e}")
