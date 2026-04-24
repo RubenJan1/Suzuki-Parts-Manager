@@ -12,6 +12,17 @@ from __future__ import annotations
 import re
 import pandas as pd
 
+# Expliciete module-level imports zodat PyInstaller pdfplumber en zijn
+# sub-afhankelijkheden meebundelt in de .exe (lazy imports in functies worden
+# door PyInstaller's statische analyse niet automatisch gevonden).
+try:
+    import pdfplumber          # noqa: F401
+    import pdfminer            # noqa: F401
+    import pdfminer.high_level # noqa: F401
+    import pdfminer.layout     # noqa: F401
+except ImportError:
+    pass
+
 
 def _parse_euro(s: str) -> float:
     """Zet '€ 12.345,67' om naar float 12345.67."""
