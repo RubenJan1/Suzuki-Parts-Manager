@@ -433,6 +433,9 @@ class FactuurMakerEngine:
         with open(output_path, "wb") as f:
             f.write(buffer.read())
 
+        # JSON-concept opslaan naast de PDF (zelfde naam, .json extensie)
+        self._save_draft_json(output_path.replace(".pdf", ".json"), df, sign)
+
         # Audit log entry (append-only)
         self._append_audit_log({
             "ts": datetime.now().isoformat(timespec="seconds"),
@@ -452,3 +455,58 @@ class FactuurMakerEngine:
         })
 
         return output_path
+
+    # -------------------------------------------------
+    # DRAFT JSON (opslaan + laden)
+    # -------------------------------------------------
+
+    def _save_draft_json(self, path: str, df: pd.DataFrame, sign: int) -> None:
+        """Sla factuurgegevens op als JSON naast de PDF (voor herbewerking)."""
+        try:
+            lines = []
+            for _, r in df.iterrows():
+                lines.append({
+                    "Artikel":      str(r.get("Artikel", "") or "").strip(),
+                    "Omschrijving": str(r.get("Omschrijving", "") or "").strip(),
+                    "Aantal":       int(r.get("Aantal", 0)),
+                    "Prijs":        float(r.get("Prijs", 0.0)),
+                })
+
+            data = {
+                "invoice_number":          str(self.invoice_number or ""),
+                "supplier_number":         str(self.supplier_number or ""),
+                "bill_to":                 str(self.bill_to or ""),
+                "billing_address":         str(self.billing_address or ""),
+                "document_type":           str(self.document_type or "invoice"),
+                "original_invoice_number": str(self.original_invoice_number or ""),
+                "credit_reason":           str(self.credit_reason or ""),
+                "verzendkosten":           float(self.verzendkosten) * sign,
+                "lines":                   lines,
+            }
+            Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass  # draft opslaan mag nooit de PDF-stap blokkeren
+
+    def load_draft_json(self, path: str) -> dict:
+        """
+        Laad een eerder opgeslagen factuur-draft.
+        Geeft een dict terug die direct door de tab verwerkt kan worden.
+        """
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+
+        lines = raw.get("lines", [])
+        df = pd.DataFrame(lines, columns=["Artikel", "Omschrijving", "Aantal", "Prijs"])
+        df["Aantal"] = pd.to_numeric(df["Aantal"], errors="coerce").fillna(0).astype(int)
+        df["Prijs"]  = pd.to_numeric(df["Prijs"],  errors="coerce").fillna(0.0).astype(float)
+
+        return {
+            "invoice_number":          raw.get("invoice_number", ""),
+            "supplier_number":         raw.get("supplier_number", ""),
+            "bill_to":                 raw.get("bill_to", ""),
+            "billing_address":         raw.get("billing_address", ""),
+            "document_type":           raw.get("document_type", "invoice"),
+            "original_invoice_number": raw.get("original_invoice_number", ""),
+            "credit_reason":           raw.get("credit_reason", ""),
+            "verzendkosten":           abs(float(raw.get("verzendkosten", 0.0))),
+            "df":                      df,
+        }

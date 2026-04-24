@@ -427,7 +427,109 @@ class TabFactuurmaker(QWidget):
 
         root.addWidget(box_actions)
 
+        # =========================
+        # BESTAANDE FACTUUR LADEN
+        # =========================
+        box_herstel = QGroupBox("6. Bestaande factuur laden (fout herstellen)")
+        box_herstel_l = QVBoxLayout(box_herstel)
+
+        lbl_herstel = QLabel(
+            "Laad een eerder gegenereerde factuur om deze te bewerken en opnieuw te genereren."
+        )
+        lbl_herstel.setWordWrap(True)
+        box_herstel_l.addWidget(lbl_herstel)
+
+        rij_herstel = QHBoxLayout()
+
+        btn_laden_json = QPushButton("Laden uit JSON (snel)")
+        btn_laden_json.setObjectName("secondary")
+        btn_laden_json.setMinimumHeight(36)
+        btn_laden_json.setToolTip(
+            "Selecteer het .json-bestand naast de PDF.\n"
+            "Alle gegevens worden exact hersteld."
+        )
+        btn_laden_json.clicked.connect(self._herstel_uit_json)
+
+        btn_laden_pdf = QPushButton("Laden uit PDF")
+        btn_laden_pdf.setObjectName("secondary")
+        btn_laden_pdf.setMinimumHeight(36)
+        btn_laden_pdf.setToolTip(
+            "Selecteer de originele PDF.\n"
+            "De tekst wordt automatisch uitgelezen (minder nauwkeurig)."
+        )
+        btn_laden_pdf.clicked.connect(self._herstel_uit_pdf)
+
+        rij_herstel.addWidget(btn_laden_json)
+        rij_herstel.addWidget(btn_laden_pdf)
+        rij_herstel.addStretch()
+        box_herstel_l.addLayout(rij_herstel)
+
+        root.addWidget(box_herstel)
+
         self.on_doc_type_changed()
+    # =====================================================
+    # HERSTEL BESTAANDE FACTUUR
+    # =====================================================
+
+    def _herstel_uit_data(self, data: dict):
+        """Vul alle formuliervelden vanuit een geladen factuur-dict."""
+        self.engine.clear_bestellingen()
+        self.engine.work_df = data["df"].copy()
+        self.engine.merge_work_df()
+        self.engine.sort_work_df()
+
+        self.txt_invoice.setText(data.get("invoice_number", ""))
+        self.txt_supplier.setText(data.get("supplier_number", ""))
+        self.txt_billto.setText(data.get("bill_to", ""))
+        self.txt_address.setPlainText(data.get("billing_address", ""))
+        self.spin_shipping.setValue(abs(float(data.get("verzendkosten", 0.0))))
+
+        doc_type = data.get("document_type", "invoice")
+        if doc_type == "credit":
+            self.rb_credit.setChecked(True)
+        else:
+            self.rb_invoice.setChecked(True)
+
+        orig = data.get("original_invoice_number", "")
+        self.txt_original_invoice.setText(orig)
+
+        reason = data.get("credit_reason", "")
+        idx = self.cmb_credit_reason.findText(reason)
+        if idx >= 0:
+            self.cmb_credit_reason.setCurrentIndex(idx)
+
+        self._loaded_bron = None
+        self.refresh_preview()
+        self._validate_form()
+        self.lbl_status.setText(
+            f"{len(self.engine.work_df)} regel(s) geladen — pas aan en genereer opnieuw"
+        )
+
+    def _herstel_uit_json(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Selecteer factuur-JSON", str(self.engine.output_dir), "JSON bestanden (*.json)"
+        )
+        if not path:
+            return
+        try:
+            data = self.engine.load_draft_json(path)
+            self._herstel_uit_data(data)
+        except Exception as e:
+            QMessageBox.critical(self, "Fout", f"Kan JSON niet laden:\n{e}")
+
+    def _herstel_uit_pdf(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Selecteer factuur-PDF", str(self.engine.output_dir), "PDF bestanden (*.pdf)"
+        )
+        if not path:
+            return
+        try:
+            from services.factuur_pdf_parser import parse_invoice_pdf
+            data = parse_invoice_pdf(path)
+            self._herstel_uit_data(data)
+        except Exception as e:
+            QMessageBox.critical(self, "Fout", f"Kan PDF niet inlezen:\n{e}")
+
     # =====================================================
     # LOGIC
     # =====================================================
