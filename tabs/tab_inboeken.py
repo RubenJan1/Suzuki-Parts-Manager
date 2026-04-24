@@ -23,7 +23,7 @@ import subprocess
 import sys
 import traceback
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton, QFileDialog,
     QMessageBox, QTreeWidget, QTreeWidgetItem, QSplitter, QDialog, QTableWidget,
@@ -853,8 +853,10 @@ class TabInboeken(QWidget):
             lines = [l for l in lines if l.strip()]
             new_desc = "\n".join(lines + [superseded_line]) if lines else superseded_line
             self.ed_desc.setPlainText(new_desc)
-        except Exception:
-            pass
+            self.ed_desc.moveCursor(QTextCursor.End)
+            self._log(f"SUPERSEDED | {superseded_line}")
+        except Exception as e:
+            self._log(f"SUPERSEDED | fout: {e}")
 
     def _search_via_superseded(self, q: str) -> list:
         """Zoek via superseded nummers in de WC export als het originele nummer niet gevonden wordt."""

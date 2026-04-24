@@ -253,11 +253,12 @@ class TabWebsite277(QWidget):
         ))
 
         self.tbl_update = QTableWidget()
-        self.tbl_update.setColumnCount(3)
-        self.tbl_update.setHorizontalHeaderLabels(["Artikelnummer", "Nieuwe voorraad", "Locatie"])
+        self.tbl_update.setColumnCount(4)
+        self.tbl_update.setHorizontalHeaderLabels(["Artikelnummer", "Nieuwe voorraad", "Locatie", "Website prijs"])
         self.tbl_update.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.tbl_update.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.tbl_update.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.tbl_update.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.tbl_update.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.tbl_update.setMinimumHeight(60)
         lay.addWidget(self.tbl_update)
@@ -529,17 +530,21 @@ class TabWebsite277(QWidget):
         col_title = next((c for c in df.columns if str(c).lower() == "title"), None)
         col_stock = next((c for c in df.columns if str(c).lower() == "stock"), None)
         col_loc   = next((c for c in df.columns if str(c).lower() == "locatie"), None)
+        col_prijs = next((c for c in df.columns if str(c).lower() == "prijs"), None)
 
         if not col_title or not col_stock:
             return
 
-        self._update_df_kolommen = (col_title, col_stock, col_loc)
+        self._update_df_kolommen = (col_title, col_stock, col_loc, col_prijs)
+
+        df = df.sort_values(by=col_title, ascending=True, ignore_index=True)
 
         self.tbl_update.setRowCount(len(df))
         for i, (_, r) in enumerate(df.iterrows()):
             title = str(r.get(col_title, ""))
             stock = str(r.get(col_stock, ""))
             loc   = str(r.get(col_loc, "")) if col_loc else ""
+            prijs = str(r.get(col_prijs, "")) if col_prijs else ""
 
             item_t = QTableWidgetItem(title)
             item_t.setFlags(item_t.flags() & ~Qt.ItemIsEditable)
@@ -549,9 +554,13 @@ class TabWebsite277(QWidget):
             item_l = QTableWidgetItem(loc)
             item_l.setFlags(item_l.flags() & ~Qt.ItemIsEditable)
 
+            item_p = QTableWidgetItem(f"€ {prijs}" if prijs else "")
+            item_p.setFlags(item_p.flags() & ~Qt.ItemIsEditable)
+
             self.tbl_update.setItem(i, 0, item_t)
             self.tbl_update.setItem(i, 1, item_s)
             self.tbl_update.setItem(i, 2, item_l)
+            self.tbl_update.setItem(i, 3, item_p)
 
         self._pas_tabel_hoogte_aan(self.tbl_update)
 
@@ -574,14 +583,20 @@ class TabWebsite277(QWidget):
 
         try:
             df = pd.read_excel(self._update_path, dtype=str).fillna("")
-            col_title, col_stock, _ = getattr(self, "_update_df_kolommen", ("Title", "Stock", "Locatie"))
+            _cols = getattr(self, "_update_df_kolommen", ("Title", "Stock", "Locatie", None))
+            col_title, col_stock = _cols[0], _cols[1]
 
             if col_stock in df.columns and col_title in df.columns:
+                title_to_stock = {}
                 for rij in range(self.tbl_update.rowCount()):
                     t_item = self.tbl_update.item(rij, 0)
                     s_item = self.tbl_update.item(rij, 1)
-                    if t_item and s_item and rij < len(df):
-                        df.at[df.index[rij], col_stock] = s_item.text()
+                    if t_item and s_item:
+                        title_to_stock[t_item.text()] = s_item.text()
+                for idx in df.index:
+                    title = str(df.at[idx, col_title])
+                    if title in title_to_stock:
+                        df.at[idx, col_stock] = title_to_stock[title]
 
             df.to_excel(self._update_path, index=False)
 
