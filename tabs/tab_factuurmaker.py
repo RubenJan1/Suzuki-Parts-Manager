@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from engines.engine_factuurmaker import FactuurMakerEngine
-from utils.paths import output_root
+from utils.paths import output_root, resource_path
 from utils.theme import apply_theme
 from PySide6.QtGui import QColor
 
@@ -374,11 +374,15 @@ class TabFactuurmaker(QWidget):
 
         row_edit = QHBoxLayout()
 
-        btn_add_row = QPushButton("Add manual item")
+        btn_add_row = QPushButton("➕  Artikel zelf toevoegen")
         btn_add_row.setObjectName("secondary")
+        btn_add_row.setToolTip(
+            "Gebruik dit als een artikel niet automatisch gevonden is,\n"
+            "maar je het toch wilt factureren."
+        )
         btn_add_row.clicked.connect(self.on_add_row)
 
-        btn_remove = QPushButton("Remove selected row")
+        btn_remove = QPushButton("Verwijder geselecteerde regel")
         btn_remove.setObjectName("danger")
         btn_remove.clicked.connect(self.on_remove_row)
 
@@ -704,7 +708,7 @@ class TabFactuurmaker(QWidget):
             self.engine.supplier_number = (self.txt_supplier.text() or "").strip()
             self.engine.bill_to = bill_to
             self.engine.billing_address = addr
-            self.engine.logo_path = "assets/logo.png"
+            self.engine.logo_path = str(resource_path("assets/logo.png"))
             self._update_engine()
 
             self.engine.document_type = "credit" if is_credit else "invoice"

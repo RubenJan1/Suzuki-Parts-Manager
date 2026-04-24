@@ -16,7 +16,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from utils.paths import output_root
+from utils.paths import output_root, resource_path
 
 # =====================================================
 # CONSTANTS
@@ -77,7 +77,7 @@ class FactuurMakerEngine:
         self.original_invoice_number: str = ""
         self.credit_reason: str = ""
 
-        self.logo_path: str = "assets/logo.png"
+        self.logo_path: str = str(resource_path("assets/logo.png"))
 
         # Storage paths
         self.output_dir = output_root() / "facturen"
