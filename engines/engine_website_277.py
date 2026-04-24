@@ -1101,6 +1101,9 @@ class Website277Engine:
         wc[col_title] = wc[col_title].astype(str).str.strip()
         wc[col_id] = wc[col_id].astype(str).str.strip()
 
+        # Genormaliseerde titels (streepjes/spaties verwijderd) voor CMS-nummers zonder koppeltekens
+        wc["_title_norm"] = wc[col_title].str.replace(r"[-\s]", "", regex=True).str.upper()
+
         updates = []
         picklijst = []
         tekort_log = []
@@ -1212,7 +1215,15 @@ class Website277Engine:
             hit = wc[wc[col_title] == title].copy()
             matched_via = "TITLE"
 
-            # Als exact match bestaat maar alles is 0 voorraad -> behandel alsof niet gevonden,
+            # Fallback: CMS stuurt soms nummers zonder koppeltekens (bijv. 0932005002)
+            if hit.empty:
+                title_norm = re.sub(r"[-\s]", "", title).upper()
+                if title_norm:
+                    hit = wc[wc["_title_norm"] == title_norm].copy()
+                    if not hit.empty:
+                        matched_via = "TITLE_NODASH"
+
+            # Als match bestaat maar alles is 0 voorraad -> behandel alsof niet gevonden,
             # zodat we superseded/same-as via korte beschrijving kunnen proberen.
             if not hit.empty:
                 hit["_stock_tmp"] = hit[col_stock].apply(to_int)
@@ -1249,7 +1260,7 @@ class Website277Engine:
                 continue
 
             # meerdere matches via fallback -> niet automatisch afboeken
-            if matched_via != "TITLE" and len(hit) > 1:
+            if matched_via not in ("TITLE", "TITLE_NODASH") and len(hit) > 1:
                 tekort_log.append([title, 0, qty, qty, r["Factuur"], f"Meerdere matches via {matched_via} (controle nodig)"])
                 picklijst.append([title, r["Omschrijving"], qty, 0, 0, 0, "MEERDERE MATCHES", r["Prijs"], r["Factuur"], f"Meerdere matches via {matched_via} (controle nodig)"])
                 not_found_lines += 1

@@ -253,6 +253,65 @@ class EngineZoeklijst:
             source, row, dup_idxs = self.lookup_any(p)
 
             if source == "NO" or row is None:
+                # Probeer via superseded familie (bidirectioneel)
+                found_via: Optional[tuple] = None
+                sup_numbers: List[str] = []
+                try:
+                    from services.superseded import lookup_superseded
+                    sup_numbers = lookup_superseded(p)
+                    for sup_nr in sup_numbers:
+                        s2, r2, d2 = self.lookup_any(sup_nr)
+                        if s2 != "NO" and r2 is not None:
+                            found_via = (s2, r2, d2, sup_nr)
+                            break
+                except Exception:
+                    pass
+
+                if found_via:
+                    s2, r2, d2, sup_nr = found_via
+                    sup_note = f"Gevonden via superseded → {sup_nr}"
+                    if s2 == "WC":
+                        notes = [sup_note]
+                        if d2:
+                            notes.append(f"DUBBEL in WC ({1 + len(d2)}x)")
+                        rows.append({
+                            "Part number": p,
+                            "Source": "WC",
+                            "Found": "YES",
+                            "Stock": get(r2, self._stock_col),
+                            "Price": get(r2, self._price_col),
+                            "Locatie": get(r2, self._location_col),
+                            "Notes": " | ".join(notes),
+                        })
+                    else:  # TLC
+                        stock_str = get(r2, self._tlc_stock_col)
+                        stock_val = _to_float_safe(stock_str)
+                        if stock_val is not None and stock_val <= 0:
+                            rows.append({
+                                "Part number": p,
+                                "Source": "TLC",
+                                "Found": "NO",
+                                "Stock": stock_str,
+                                "Price": get(r2, self._tlc_price_col),
+                                "Locatie": get(r2, self._tlc_location_col),
+                                "Notes": f"{sup_note} | Voorraad = 0 (niet beschikbaar)",
+                            })
+                        else:
+                            rows.append({
+                                "Part number": p,
+                                "Source": "TLC",
+                                "Found": "YES",
+                                "Stock": stock_str,
+                                "Price": get(r2, self._tlc_price_col),
+                                "Locatie": get(r2, self._tlc_location_col),
+                                "Notes": sup_note,
+                            })
+                    continue
+
+                # Echt niet gevonden — vermeld eventuele familie als hint
+                not_found_note = "Niet gevonden (WC + TLC)"
+                if sup_numbers:
+                    not_found_note += f" | Superseded familie: {', '.join(sup_numbers[:4])}"
                 rows.append({
                     "Part number": p,
                     "Source": "NO",
@@ -260,7 +319,7 @@ class EngineZoeklijst:
                     "Stock": "",
                     "Price": "",
                     "Locatie": "",
-                    "Notes": "Niet gevonden (WC + TLC)",
+                    "Notes": not_found_note,
                 })
                 continue
 

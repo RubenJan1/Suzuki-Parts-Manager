@@ -22,6 +22,10 @@ import re
 from typing import Dict, List, Optional, Set
 
 import pandas as pd
+try:
+    import xlrd  # noqa: F401 — explicit import zodat PyInstaller xlrd meebundelt
+except ImportError:
+    pass
 
 _index: Optional[Dict[str, Set[str]]] = None
 
