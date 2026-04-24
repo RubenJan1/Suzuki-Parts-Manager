@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QRadioButton, QComboBox, QDoubleSpinBox,
     QTableWidget, QHeaderView, QSizePolicy,
     QGroupBox, QButtonGroup, QTableWidgetItem, QMessageBox, QFileDialog,
-    QScrollArea, QFrame,
+    QScrollArea, QFrame, QMenu,
 )
 
 from engines.engine_factuurmaker import FactuurMakerEngine
@@ -375,6 +375,9 @@ class TabFactuurmaker(QWidget):
         hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._tabel_context_menu)
 
         box_preview_l.addWidget(self.table)
 
@@ -860,12 +863,25 @@ class TabFactuurmaker(QWidget):
         folder.mkdir(parents=True, exist_ok=True)
         os.startfile(str(folder))
 
+    def _tabel_context_menu(self, pos):
+        row = self.table.rowAt(pos.y())
+        if row < 0:
+            return
+        self.table.selectRow(row)
+        menu = QMenu(self)
+        act_del = menu.addAction("Verwijder regel")
+        result = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if result == act_del:
+            self.on_remove_row(confirm=False)
+
     def on_search_changed(self, text: str):
         q = (text or "").strip().lower()
         for r in range(self.table.rowCount()):
             item = self.table.item(r, 0)
             part = item.text().lower() if item else ""
             self.table.setRowHidden(r, bool(q) and (q not in part))
+        # Hoogte bijwerken zodat verbergen/tonen van rijen altijd klopt
+        self._pas_tabel_hoogte_aan(self.table)
 
     def on_table_edited(self, item):
         row = item.row()
@@ -891,12 +907,13 @@ class TabFactuurmaker(QWidget):
         self.refresh_preview()
         self._validate_form()
 
-    def on_remove_row(self):
+    def on_remove_row(self, confirm=True):
         row = self.table.currentRow()
         if row < 0:
             return
-        if QMessageBox.question(self, "Remove item", "Remove selected row from document?") != QMessageBox.Yes:
-            return
+        if confirm:
+            if QMessageBox.question(self, "Verwijder regel", "Regel verwijderen uit het document?") != QMessageBox.Yes:
+                return
         self.engine.work_df = self.engine.work_df.drop(self.engine.work_df.index[row]).reset_index(drop=True)
         self.engine.merge_work_df()
         self.engine.sort_work_df()
