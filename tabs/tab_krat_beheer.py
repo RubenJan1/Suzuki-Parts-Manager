@@ -104,7 +104,7 @@ beprijzen en exporteren naar WooCommerce.</p>
 
 <h3>De 3 stappen op een rij</h3>
 <ol>
-  <li><b>Inventarisatie</b> — Scan elk artikelnummer, kies of het nieuw of
+  <li><b>Inventarisatie</b> — Typ elk artikelnummer, kies of het nieuw of
       bestaand is in WC, noteer de voorraad en selecteer categorieën.</li>
   <li><b>Beprijzing</b> — Samen met de baas: typ prijs per artikel,
       <b>Enter</b> = opslaan en volgende.</li>
@@ -122,7 +122,7 @@ beprijzen en exporteren naar WooCommerce.</p>
 
 <h3>Statussen</h3>
 <ul>
-  <li>🔵 <b>Inventarisatie bezig</b> — Je bent nog artikelen aan het scannen.</li>
+  <li>🔵 <b>Inventarisatie bezig</b> — Je bent nog artikelen aan het inventariseren.</li>
   <li>🟠 <b>Wacht op prijs</b> — Inventarisatie klaar; beprijzing nog niet gestart.</li>
   <li>🟡 <b>Beprijzing bezig</b> — Samen met de baas aan het beprijzen.</li>
   <li>🟢 <b>Klaar voor export</b> — Alle artikelen beprijsd of overgeslagen.</li>
@@ -310,7 +310,7 @@ class TabKratBeheer(QWidget):
         hdr_row.addStretch()
         btn_help_ov = QPushButton("?")
         btn_help_ov.setObjectName("secondary")
-        btn_help_ov.setFixedSize(28, 28)
+        btn_help_ov.setFixedWidth(44)
         btn_help_ov.setToolTip("Uitleg & stappenplan")
         btn_help_ov.clicked.connect(lambda: KratHelpDialog(0, self).exec())
         hdr_row.addWidget(btn_help_ov)
@@ -459,7 +459,7 @@ class TabKratBeheer(QWidget):
         inv_hdr_row.addStretch()
         btn_help_inv = QPushButton("?")
         btn_help_inv.setObjectName("secondary")
-        btn_help_inv.setFixedSize(28, 28)
+        btn_help_inv.setFixedWidth(44)
         btn_help_inv.setToolTip("Uitleg inventarisatie")
         btn_help_inv.clicked.connect(lambda: KratHelpDialog(1, self).exec())
         inv_hdr_row.addWidget(btn_help_inv)
@@ -906,7 +906,7 @@ class TabKratBeheer(QWidget):
         bp_hdr_row.addStretch()
         btn_help_bp = QPushButton("?")
         btn_help_bp.setObjectName("secondary")
-        btn_help_bp.setFixedSize(28, 28)
+        btn_help_bp.setFixedWidth(44)
         btn_help_bp.setToolTip("Uitleg beprijzing")
         btn_help_bp.clicked.connect(lambda: KratHelpDialog(2, self).exec())
         bp_hdr_row.addWidget(btn_help_bp)
@@ -1188,7 +1188,7 @@ class TabKratBeheer(QWidget):
         exp_hdr_row.addStretch()
         btn_help_exp = QPushButton("?")
         btn_help_exp.setObjectName("secondary")
-        btn_help_exp.setFixedSize(28, 28)
+        btn_help_exp.setFixedWidth(44)
         btn_help_exp.setToolTip("Uitleg export")
         btn_help_exp.clicked.connect(lambda: KratHelpDialog(3, self).exec())
         exp_hdr_row.addWidget(btn_help_exp)
