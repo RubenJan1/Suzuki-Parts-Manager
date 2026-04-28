@@ -799,7 +799,7 @@ class TabKratBeheer(QWidget):
                 extra, ok = QInputDialog.getInt(
                     self, "Aantal ophogen",
                     f"Hoeveel stuks extra van {nummer}?",
-                    value=1, min=1, max=9999,
+                    1, 1, 9999,
                 )
                 if ok:
                     bestaand["voorraad"] = bestaand.get("voorraad", 0) + extra
@@ -895,7 +895,7 @@ class TabKratBeheer(QWidget):
         nieuw, ok = QInputDialog.getInt(
             self, "Voorraad aanpassen",
             f"Nieuw aantal voor {art.get('artikelnummer', '')}:",
-            value=huidig, min=0, max=9999,
+            huidig, 0, 9999,
         )
         if ok and nieuw != huidig:
             art["voorraad"] = nieuw
