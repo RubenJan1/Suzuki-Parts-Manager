@@ -22,13 +22,14 @@ import os
 import subprocess
 import sys
 import traceback
+import webbrowser
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton, QFileDialog,
-    QMessageBox, QTreeWidget, QTreeWidgetItem, QSplitter, QDialog, QTableWidget,
-    QTableWidgetItem, QAbstractItemView, QHeaderView, QGroupBox, QMenu,
-    QScrollArea, QFrame, QSizePolicy,
+    QMessageBox, QTreeWidget, QTreeWidgetItem, QSplitter, QDialog, QDialogButtonBox,
+    QFormLayout, QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView,
+    QGroupBox, QMenu, QScrollArea, QFrame, QSizePolicy,
 )
 
 from engines.engine_inboeken import InboekenEngine, SearchHit, CATEGORIES_TREE, parse_price, round_up_to_5cent
@@ -101,6 +102,63 @@ class ChooseHitDialog(QDialog):
             return
         self.selected_hit = self.hits[r]
         self.accept()
+
+
+class BevestigingDialog(QDialog):
+    """Toont een leesbaar overzicht van alle velden vóór het opslaan."""
+
+    def __init__(self, title, stock, prijs, locatie, desc, cats, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Bevestig opslaan")
+        self.setMinimumWidth(500)
+
+        lay = QVBoxLayout(self)
+        lay.setSpacing(12)
+
+        hdr = QLabel("Controleer alle gegevens — klopt alles?")
+        hdr.setStyleSheet("font-size: 14px; font-weight: bold;")
+        lay.addWidget(hdr)
+
+        box = QFrame()
+        box.setFrameShape(QFrame.StyledPanel)
+        box.setStyleSheet("""
+            QFrame {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 8px;
+                padding: 4px;
+            }
+        """)
+        fl = QFormLayout(box)
+        fl.setVerticalSpacing(8)
+        fl.setHorizontalSpacing(16)
+
+        def row_lbl(text: str) -> QLabel:
+            l = QLabel(text or "—")
+            l.setWordWrap(True)
+            return l
+
+        fl.addRow("Artikelnummer:", row_lbl(title))
+        fl.addRow("Voorraad:", row_lbl(str(stock) if stock else "0"))
+        fl.addRow("Prijs:", row_lbl(f"€ {prijs}" if prijs else "—"))
+        fl.addRow("Locatie:", row_lbl(locatie or "— (leeg)"))
+        fl.addRow("Beschrijving:", row_lbl(desc))
+
+        cats_lbl = QLabel("\n".join(cats) if cats else "— geen categorieën")
+        cats_lbl.setWordWrap(True)
+        cats_lbl.setStyleSheet("color: palette(text);")
+        fl.addRow("Categorieën:", cats_lbl)
+
+        lay.addWidget(box)
+
+        btns = QDialogButtonBox()
+        btn_ok = btns.addButton("✅  Bevestig & Sla op", QDialogButtonBox.AcceptRole)
+        btn_ok.setObjectName("primary")
+        btn_cancel = btns.addButton("✏️  Terug — nog aanpassen", QDialogButtonBox.RejectRole)
+        btn_cancel.setObjectName("secondary")
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        lay.addWidget(btns)
 
 
 class TabInboeken(QWidget):
@@ -318,6 +376,12 @@ class TabInboeken(QWidget):
         btn_load.setObjectName("primary")
         btn_load.clicked.connect(self.do_search_title)
         r_title.addWidget(btn_load)
+
+        btn_cms = QPushButton("CMS.nl →")
+        btn_cms.setObjectName("secondary")
+        btn_cms.setToolTip("Zoek dit artikelnummer op cmsnl.com (opent browser)")
+        btn_cms.clicked.connect(self._open_cms_nl)
+        r_title.addWidget(btn_cms)
 
         dbl.addLayout(r_title)
 
@@ -914,6 +978,19 @@ class TabInboeken(QWidget):
                 prijs = "0"
                 locatie = ""
 
+        # Bevestigingsoverzicht vóór opslaan
+        dlg = BevestigingDialog(
+            title=title,
+            stock=stock,
+            prijs=prijs,
+            locatie=locatie,
+            desc=short_desc,
+            cats=cats,
+            parent=self,
+        )
+        if dlg.exec() != QDialog.Accepted:
+            return
+
         # ✅ engine call + debug bij crash
         try:
             wc_id_to_use = None if self._force_new else self.current_wc_id
@@ -1073,6 +1150,15 @@ class TabInboeken(QWidget):
         added = sorted(self.selected_category_paths - before)
         self._log("REINER | gevuld (added: " + (", ".join(added) if added else "—") + ")")
         self._refresh_validation()
+
+    def _open_cms_nl(self):
+        nummer = (self.ed_title.text() or "").strip()
+        if not nummer:
+            QMessageBox.information(self, "CMS.nl", "Vul eerst een artikelnummer in bij Title.")
+            return
+        url = f"https://www.cmsnl.com/search/?q={nummer}"
+        webbrowser.open(url)
+        self._log(f"CMS.nl | geopend voor: {nummer}")
 
     def _open_output_folder(self, folder: str) -> None:
         if not os.path.isdir(folder):
