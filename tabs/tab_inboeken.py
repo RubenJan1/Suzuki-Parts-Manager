@@ -1154,9 +1154,9 @@ class TabInboeken(QWidget):
     def _open_cms_nl(self):
         nummer = (self.ed_title.text() or "").strip()
         if not nummer:
-            QMessageBox.information(self, "CMS.nl", "Vul eerst een artikelnummer in bij Title.")
+            QMessageBox.information(self, "cmsnl.com", "Vul eerst een artikelnummer in bij Title.")
             return
-        url = f"https://www.cmsnl.com/search/?q={nummer}"
+        url = f"https://www.cmsnl.com/search/?section=product&q={nummer}"
         webbrowser.open(url)
         self._log(f"CMS.nl | geopend voor: {nummer}")
 
