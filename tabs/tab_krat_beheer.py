@@ -27,7 +27,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView,
-    QMessageBox, QDialog, QDialogButtonBox, QFormLayout, QSplitter,
+    QInputDialog, QMessageBox, QDialog, QDialogButtonBox, QFormLayout, QSplitter,
     QTreeWidget, QTreeWidgetItem, QGroupBox, QTextEdit, QTextBrowser,
     QFrame, QScrollArea, QStackedWidget,
 )
@@ -618,6 +618,7 @@ class TabKratBeheer(QWidget):
         th.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         th.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.inv_table.setMinimumHeight(130)
+        self.inv_table.doubleClicked.connect(self._inv_edit_aantal)
         rl.addWidget(self.inv_table)
 
         btn_del_art = QPushButton("Verwijder geselecteerd artikel")
@@ -781,6 +782,32 @@ class TabKratBeheer(QWidget):
             QMessageBox.warning(self, "Artikelnummer vereist", "Vul een artikelnummer in.")
             return
 
+        # Duplicaat-check: staat dit nummer al in het krat?
+        bestaand = next(
+            (a for a in (self._active_krat.get("artikelen", []) if self._active_krat else [])
+             if a.get("artikelnummer", "").upper() == nummer.upper()),
+            None,
+        )
+        if bestaand is not None:
+            r = QMessageBox.question(
+                self, "Al in krat",
+                f"'{nummer}' staat al in dit krat (aantal: {bestaand.get('voorraad', 0)}).\n\n"
+                "Wil je het aantal ophogen?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if r == QMessageBox.Yes:
+                extra, ok = QInputDialog.getInt(
+                    self, "Aantal ophogen",
+                    f"Hoeveel stuks extra van {nummer}?",
+                    value=1, min=1, max=9999,
+                )
+                if ok:
+                    bestaand["voorraad"] = bestaand.get("voorraad", 0) + extra
+                    save_krat(self._active_krat)
+                    self._inv_refresh_table()
+                    self._inv_reset_form()
+            return
+
         omschr = self.inv_omschr.text().strip()
         try:
             voorraad = int(float(self.inv_voorraad.text().replace(",", ".") or "0"))
@@ -852,6 +879,26 @@ class TabKratBeheer(QWidget):
             del artikelen[row]
             for j, a in enumerate(artikelen):
                 a["positie"] = j
+            save_krat(self._active_krat)
+            self._inv_refresh_table()
+
+    def _inv_edit_aantal(self, index):
+        """Dubbel-klik op Aantal-cel → pas voorraad aan."""
+        if index.column() != 3:
+            return
+        row = index.row()
+        artikelen = self._active_krat.get("artikelen", []) if self._active_krat else []
+        if row >= len(artikelen):
+            return
+        art = artikelen[row]
+        huidig = art.get("voorraad", 0)
+        nieuw, ok = QInputDialog.getInt(
+            self, "Voorraad aanpassen",
+            f"Nieuw aantal voor {art.get('artikelnummer', '')}:",
+            value=huidig, min=0, max=9999,
+        )
+        if ok and nieuw != huidig:
+            art["voorraad"] = nieuw
             save_krat(self._active_krat)
             self._inv_refresh_table()
 
