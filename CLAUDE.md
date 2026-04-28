@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Suzuki Parts Manager is a PySide6 desktop application for **Vlaandere Motoren** (a Suzuki motorcycle parts dealer in Bolsward, NL). It manages parts inventory, generates WP All Import–ready Excel files, processes CMS orders, and produces PDF invoices.
 
-The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.1.13` (see `version.py`).
+The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.1.14` (see `version.py`).
 
 ## Running the app
 

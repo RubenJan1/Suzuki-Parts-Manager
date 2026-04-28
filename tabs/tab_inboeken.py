@@ -351,7 +351,7 @@ class TabInboeken(QWidget):
         # Gewikkeld in QScrollArea zodat kleinere schermen verticaal kunnen scrollen
         # ======================================================
         right_content = QWidget()
-        right_content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        right_content.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         rl = QVBoxLayout(right_content)
         rl.setSpacing(10)
         rl.setContentsMargins(0, 0, 4, 0)

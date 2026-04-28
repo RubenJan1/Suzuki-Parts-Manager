@@ -1512,7 +1512,7 @@ class InboekenEngine:
                 # matches 0 of >1 => nieuwe regel (waterproof)
 
             if actie == "Nieuw":
-                self.df = pd.concat([self.df, pd.DataFrame([{
+                self.df.loc[len(self.df)] = {
                     "ID": "",
                     "Title": title,
                     "Productcategorieën": cats_export,
@@ -1522,7 +1522,7 @@ class InboekenEngine:
                     "Prijs": prijs_f,
                     "Prijs_orig": "",
                     "Korting_pct": "",
-                }])], ignore_index=True)
+                }
 
 
         self._dirty = True
