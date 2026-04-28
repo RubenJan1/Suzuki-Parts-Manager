@@ -371,8 +371,7 @@ class TabWebsite277(QWidget):
         self._update_path = batch.get("update_path", "")
 
     def _banner_al_gedaan(self):
-        batch = self.store.get_latest_open_batch("277")
-        if batch:
+        for batch in self.store.get_open_batches("277"):
             self.store.mark_imported(batch["batch_id"])
         self.banner.hide()
         self._reset()
@@ -646,8 +645,7 @@ class TabWebsite277(QWidget):
             QMessageBox.critical(self, "Fout bij opslaan", str(e))
 
     def _markeer_klaar(self):
-        batch = self.store.get_latest_open_batch("277")
-        if batch:
+        for batch in self.store.get_open_batches("277"):
             self.store.mark_imported(batch["batch_id"])
         self._reset()
         QMessageBox.information(
