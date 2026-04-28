@@ -20,6 +20,7 @@ from tabs.tab_website_277 import TabWebsite277
 from tabs.tab_factuurmaker import TabFactuurmaker
 from tabs.tab_zoeklijst import TabZoeklijst
 from tabs.tab_intro import TabIntro
+from tabs.tab_krat_beheer import TabKratBeheer
 
 from services.update_checker import check_github_release
 from services.auto_updater import run_updater
@@ -142,8 +143,10 @@ class MainWindow(QMainWindow):
         self.tab_website = TabWebsite277(self.app_state)
         self.tab_factuur = TabFactuurmaker(self.app_state)
         self.tab_zoeklijst = TabZoeklijst(self.app_state)
+        self.tab_krat_beheer = TabKratBeheer(self.app_state)
 
         self.tabs.addTab(self.tab_inboeken, "Inboeken")
+        self.tabs.addTab(self.tab_krat_beheer, "Krat Beheer")
         self.tabs.addTab(self.tab_tradelist, "Tradelist")
         self.tabs.addTab(self.tab_1322, "1322")
         self.tabs.addTab(self.tab_tlc_update, "TLC Update")

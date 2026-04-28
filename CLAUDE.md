@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Suzuki Parts Manager is a PySide6 desktop application for **Vlaandere Motoren** (a Suzuki motorcycle parts dealer in Bolsward, NL). It manages parts inventory, generates WP All Import–ready Excel files, processes CMS orders, and produces PDF invoices.
 
-The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.0.12` (see `version.py`).
+The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.1.7` (see `version.py`).
 
 ## Running the app
 
@@ -34,7 +34,7 @@ PySide6, pandas, openpyxl, reportlab, Pillow
 | UI (tabs) | `tabs/tab_*.py` | PySide6 QWidget, calls engines, shows results |
 | Business logic | `engines/engine_*.py` | Pure data processing, no UI dependencies |
 | Shared state | `app_state.py` | `AppState` singleton passed to all tabs |
-| Services | `services/` | Update checker, batch state, auto-updater, superseded lookup |
+| Services | `services/` | Update checker, batch state, auto-updater, superseded lookup, krat state |
 | Utils | `utils/` | Paths, theming, helpers |
 
 ### AppState
@@ -57,6 +57,7 @@ PySide6, pandas, openpyxl, reportlab, Pillow
 | Website 277 | `tab_website_277.py` | `engine_website_277.py` | Deduct stock for CMS 277 orders from WC export |
 | Factuurmaker | `tab_factuurmaker.py` | `engine_factuurmaker.py` | PDF invoices/creditnotes (21% VAT, Vlaandere Motoren) |
 | Zoeklijst | `tab_zoeklijst.py` | `engine_zoeklijst.py` | Mail parser / parts search against WC + TLC |
+| Krat Beheer | `tab_krat_beheer.py` | `engine_krat_beheer.py` | Two-phase crate inventory + pricing; exports WP All Import XLSX |
 
 ## Key domain rules
 
@@ -82,6 +83,13 @@ The category tree is hardcoded as JSON in both `engine_inboeken.py` and `engine_
 
 **Website 277 – laatste stap**: Na het genereren van het output-bestand opent de tab automatisch de map (`%LOCALAPPDATA%\Suzuki Parts Manager\output\277\`) in Windows Verkenner via `os.startfile()`, zodat de gebruiker het bestand direct kan uploaden naar de website.
 
+**Krat Beheer – workflow**: Drie-fase proces voor het inventariseren van kratten met onderdelen zonder prijs.
+- Fase 1 (Inventarisatie): medewerker scant artikelnummers, kiest categorieën, noteert voorraad, controleert of artikel al in WC bestaat (nieuw aanmaken vs. samenvoegen). Zedder-tekst kan automatisch categorieën en titel/omschrijving aanvullen.
+- Fase 2 (Beprijzing): samen met de baas, keyboard-first (Enter = opslaan + volgende, Escape = overslaan). Voortgang per artikel opgeslagen na elk stap zodat beprijzing pauzeerbaar is.
+- Fase 3 (Export): Export A = nieuwe WC producten (WP All Import XLSX), Export B = samenvoeg-updates voor bestaande producten. Overgeslagen artikelen worden als uitverkocht (€0, voorraad 0) geëxporteerd.
+Kratstatus: `inventarisatie` → `wacht_op_prijs` → `beprijzing` → `klaar` → `geexporteerd`.
+Kratten worden als JSON opgeslagen via `services/krat_state.py` in `%LOCALAPPDATA%\Suzuki Parts Manager\kratten\`.
+
 ## File paths at runtime
 
 ```
@@ -91,6 +99,8 @@ The category tree is hardcoded as JSON in both `engine_inboeken.py` and `engine_
     277\                # Website 277 engine output (+ DEBUG subfolder)
     1322\               # TLC 1322 engine output
     facturen\           # PDF invoices + sequence.json + facturen_log.jsonl
+    kratten\            # Krat Beheer XLSX exports (Export A + B)
+  kratten\              # Krat JSON state files (krat_<uuid>.json)
   app.lock              # Single-instance lock
 ```
 

@@ -65,6 +65,29 @@ class TabTLCUpdate(QWidget):
         root.addWidget(uitleg)
 
         # =========================
+        # FORMAAT INFO
+        # =========================
+        formaat_info = QLabel(
+            "Vereist formaat updatebestand  (GEEN koptekstrij):\n"
+            "  Kolom A – Title      (onderdeelnummer, bijv. 09320-05006)\n"
+            "  Kolom B – Stock      (aantal, bijv. 3)\n"
+            "  Kolom C – Locatie   (bijv. TLC62)\n"
+            "  Kolom D – Prijs      (bijv. 12.50)\n\n"
+            "TLC_1.xlsx (masterbestand) heeft WEL een koptekstrij: Title | Stock | Prijs | Locatie"
+        )
+        formaat_info.setWordWrap(True)
+        formaat_info.setStyleSheet("""
+            QLabel {
+                background: palette(base);
+                border: 1px solid palette(mid);
+                border-radius: 6px;
+                padding: 8px 10px;
+                font-family: monospace;
+            }
+        """)
+        root.addWidget(formaat_info)
+
+        # =========================
         # STATUS BLOK
         # =========================
         self.lbl_status = QLabel("")
