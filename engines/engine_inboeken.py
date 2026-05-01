@@ -2129,8 +2129,10 @@ class InboekenEngine:
         candidates = [
             os.path.join(os.getcwd(), "reiners.xlsx"),
             os.path.join(os.getcwd(), "reiners.csv"),
+            os.path.join(os.getcwd(), "GT Lijst xls.xls"),
             os.path.join(os.getcwd(), "assets", "reiners.xlsx"),
             os.path.join(os.getcwd(), "assets", "reiners.csv"),
+            os.path.join(os.getcwd(), "assets", "GT Lijst xls.xls"),
         ]
 
 

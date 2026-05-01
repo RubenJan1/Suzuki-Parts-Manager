@@ -12,7 +12,21 @@
       "Bash(python -c ' *)",
       "WebSearch",
       "WebFetch(domain:www.cmsnl.com)",
-      "WebFetch(domain:www.partzilla.com)"
+      "WebFetch(domain:www.partzilla.com)",
+      "Bash(python -c \"import pdfplumber; print\\('pdfplumber OK', pdfplumber.__version__\\)\")",
+      "Bash(pip install *)",
+      "Bash(python -m py_compile engines/engine_factuurmaker.py)",
+      "Bash(python -m py_compile tabs/tab_factuurmaker.py)",
+      "Bash(python -m py_compile services/factuur_pdf_parser.py)",
+      "Bash(python -c \"import xlrd; print\\('xlrd', xlrd.__version__\\); import pandas as pd; print\\('pandas', pd.__version__\\)\")",
+      "Bash(python -m py_compile engines/engine_website_277.py)",
+      "Bash(python -m py_compile engines/engine_zoeklijst.py)",
+      "Bash(python -m py_compile engines/engine_website_277.py engines/engine_zoeklijst.py services/superseded.py)",
+      "Bash(python -m py_compile services/auto_updater.py)",
+      "Bash(python -m py_compile tabs/tab_inboeken.py)",
+      "Bash(python -c \"import tabs.tab_krat_beheer\")",
+      "Bash(python -c \"import tabs.tab_inboeken\")",
+      "WebFetch(domain:www.classicsuzukiparts.nl)"
     ]
   }
 }

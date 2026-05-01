@@ -178,7 +178,7 @@
     {
       "batch_id": "20260423_105957",
       "tab": "277",
-      "status": "PENDING_IMPORT",
+      "status": "IMPORTED",
       "update_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\WEBSITE_UPDATE_277_20260423_105957.xlsx",
       "pick_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\WEBSITE_PICKLIJST_277_20260423_105957.xlsx",
       "tekort_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\WEBSITE_TEKORT_277_20260423_105957.xlsx",
@@ -195,7 +195,8 @@
         "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\WEBSITE_TEKORT_277_20260423_105957.xlsx"
       ],
       "merge_source": false,
-      "created_at": "2026-04-23T10:59:57"
+      "created_at": "2026-04-23T10:59:57",
+      "imported_at": "2026-04-24T09:54:02"
     },
     {
       "batch_id": "20260423_110148",
@@ -309,6 +310,54 @@
       "merge_source": false,
       "created_at": "2026-04-23T11:30:39",
       "imported_at": "2026-04-23T11:30:48"
+    },
+    {
+      "batch_id": "20260424_102608",
+      "tab": "277",
+      "status": "IMPORTED",
+      "update_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\website_update\\WEBSITE_UPDATE_277_20260424_102608.xlsx",
+      "pick_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\picklijsten\\WEBSITE_PICKLIJST_277_20260424_102608.xlsx",
+      "tekort_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\tekort\\WEBSITE_TEKORT_277_20260424_102608.xlsx",
+      "stats_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102608\\RUN_STATS_20260424_102608.xlsx",
+      "debug_changes_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102608\\CHANGES_277_20260424_102608.xlsx",
+      "wc_path": "C:/Users/ruben/Downloads/wc-product-export-24-4-2026-1777016465236.csv",
+      "cms_paths": [
+        "C:/Users/ruben/Downloads/277-2090059.xlsx"
+      ],
+      "paths": [
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\website_update\\WEBSITE_UPDATE_277_20260424_102608.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\picklijsten\\WEBSITE_PICKLIJST_277_20260424_102608.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\tekort\\WEBSITE_TEKORT_277_20260424_102608.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102608\\WEBSITE_UITVERKOCHT_277_20260424_102608.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102608\\RUN_STATS_20260424_102608.xlsx"
+      ],
+      "merge_source": false,
+      "created_at": "2026-04-24T10:26:08",
+      "imported_at": "2026-04-24T10:28:27"
+    },
+    {
+      "batch_id": "20260424_102838",
+      "tab": "277",
+      "status": "IMPORTED",
+      "update_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\website_update\\WEBSITE_UPDATE_277_20260424_102838.xlsx",
+      "pick_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\picklijsten\\WEBSITE_PICKLIJST_277_20260424_102838.xlsx",
+      "tekort_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\tekort\\WEBSITE_TEKORT_277_20260424_102838.xlsx",
+      "stats_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102838\\RUN_STATS_20260424_102838.xlsx",
+      "debug_changes_path": "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102838\\CHANGES_277_20260424_102838.xlsx",
+      "wc_path": "C:/Users/ruben/Downloads/wc-product-export-24-4-2026-1777016465236.csv",
+      "cms_paths": [
+        "C:/Users/ruben/Downloads/277-2090059.xlsx"
+      ],
+      "paths": [
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\website_update\\WEBSITE_UPDATE_277_20260424_102838.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\picklijsten\\WEBSITE_PICKLIJST_277_20260424_102838.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\tekort\\WEBSITE_TEKORT_277_20260424_102838.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102838\\WEBSITE_UITVERKOCHT_277_20260424_102838.xlsx",
+        "C:\\Users\\ruben\\AppData\\Local\\Suzuki Parts Manager\\output\\277\\DEBUG\\RUN_20260424_102838\\RUN_STATS_20260424_102838.xlsx"
+      ],
+      "merge_source": false,
+      "created_at": "2026-04-24T10:28:38",
+      "imported_at": "2026-04-24T11:20:54"
     }
   ]
 }
