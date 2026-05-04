@@ -1119,27 +1119,29 @@ class Website277Engine:
         cms_rows = []
 
         for p in self.cms_paths:
-          # CMS 277 heeft GEEN headers → positioneel
             df = pd.read_excel(p, header=None, dtype=str)
 
-            # CMS 277 vaste structuur:
-            # 0 = Titel / Artikelnummer
-            # 1 = Omschrijving
-            # 2 = Aantal
-            # 3 = Prijs
-            # 4 = Factuurnummer
+            # Detecteer formaat op basis van kolom 1:
+            #   CMS-formaat  (5 kolommen): Title | Omschrijving | Aantal | Prijs | Factuur
+            #   Custom-formaat (2–4 kol.): Title | Aantal | [Prijs] | [Factuur]
+            #
+            # Heuristiek: als kolom 1 bestaat en de waarden lijken op nummers
+            # (>50% parseerbaar als int), gaan we uit van het custom-formaat.
+            col1_is_aantal = False
+            if 1 in df.columns:
+                col1_vals = df[1].fillna("").astype(str).str.strip()
+                numeric_count = sum(1 for v in col1_vals if v and v.replace(".", "").isdigit())
+                col1_is_aantal = numeric_count > len(col1_vals) * 0.5
 
-            df = df.rename(
-                columns={
-                    0: "Title",
-                    1: "Omschrijving",
-                    2: "Aantal",
-                    3: "Prijs",
-                    4: "Factuur"
-                }
-            )
+            if col1_is_aantal:
+                # Custom-formaat: Title | Aantal | [Prijs] | [Factuur]
+                df = df.rename(columns={0: "Title", 1: "Aantal", 2: "Prijs", 3: "Factuur"})
+                df["Omschrijving"] = ""
+            else:
+                # CMS-formaat: Title | Omschrijving | Aantal | Prijs | Factuur
+                df = df.rename(columns={0: "Title", 1: "Omschrijving", 2: "Aantal", 3: "Prijs", 4: "Factuur"})
 
-            # Zorg dat alle verwachte kolommen bestaan (custom bestellingen missen soms kolom 4)
+            # Vul ontbrekende kolommen aan met lege standaardwaarden
             for col, default in [("Title", ""), ("Omschrijving", ""), ("Aantal", 0), ("Prijs", 0.0), ("Factuur", "")]:
                 if col not in df.columns:
                     df[col] = default
@@ -1152,10 +1154,6 @@ class Website277Engine:
 
             df = df[df["Title"] != ""]
 
-
-            df = df[df["Title"] != ""]
-
-            
             cms_rows.extend(df.to_dict('records'))
 
         # Samengevoegd: dubbele regels -> aantallen optellen
