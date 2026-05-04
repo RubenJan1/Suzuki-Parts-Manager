@@ -1060,6 +1060,7 @@ class Website277Engine:
         self.app_state = app_state
         self.cms_paths = []
         self.last_invoice_lines: list = []
+        self.allow_pattern = False  # True = pattern producten mogen afgeboekt worden
 
     # --------------------------------------------------------
     # INPUT
@@ -1288,8 +1289,11 @@ class Website277Engine:
             non_pattern = hit[hit["_is_pattern"] == False]
             if not non_pattern.empty:
                 hit = non_pattern
+            elif self.allow_pattern:
+                # Geen CMS-order: pattern producten mogen worden afgeboekt
+                pass
             else:
-                # alles is PATTERN -> nooit afboeken
+                # alles is PATTERN -> niet afboeken voor CMS-orders
                 tekort_log.append([
                     title,
                     0,

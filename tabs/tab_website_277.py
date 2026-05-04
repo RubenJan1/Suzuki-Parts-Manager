@@ -502,6 +502,8 @@ class TabWebsite277(QWidget):
             return
 
         try:
+            # Pattern producten toestaan als de queue uitgeschakeld is (niet-CMS order)
+            self.engine.allow_pattern = not self.chk_naar_queue_277.isChecked()
             result = self.engine.run()
         except Exception as e:
             QMessageBox.critical(self, "Er ging iets mis", str(e))
