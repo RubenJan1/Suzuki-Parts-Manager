@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Suzuki Parts Manager is a PySide6 desktop application for **Vlaandere Motoren** (a Suzuki motorcycle parts dealer in Bolsward, NL). It manages parts inventory, generates WP All Import–ready Excel files, processes CMS orders, and produces PDF invoices.
 
-The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.1.14` (see `version.py`).
+The app is distributed as a Windows `.exe` (PyInstaller). Current version: `2.1.19` (see `version.py`).
 
 ## Running the app
 
@@ -69,7 +69,7 @@ PySide6, pandas, openpyxl, reportlab, Pillow
 `Originele onderdelen > 2-takt > GT series > GT750|Originele onderdelen > 2-takt > GT series`
 The category tree is hardcoded as JSON in both `engine_inboeken.py` and `engine_website_277.py` (the two copies must stay in sync).
 
-**Pattern parts**: Products ending in `-p` or with "Pattern parts" in categories are namaak/aftermarket. The Website 277 engine never deducts stock from pattern products. The Tradelist engine filters them out entirely.
+**Pattern parts**: Products ending in `-p` or with "Pattern parts" in categories are namaak/aftermarket. The Website 277 engine blocks pattern products for CMS orders (`engine.allow_pattern = False`, default). When the factuurwachtrij-checkbox is unchecked (non-CMS/custom order), `allow_pattern = True` is set before `engine.run()` so pattern products can be deducted. The Tradelist engine filters them out entirely.
 
 **Uitverkocht (out of stock)**: When stock goes to 0, price is set to 0 and location is cleared in WP All Import output files.
 
@@ -82,6 +82,17 @@ The category tree is hardcoded as JSON in both `engine_inboeken.py` and `engine_
 **Superseded nummers**: Suzuki onderdeelnummers bestaan in families (oud/nieuw model, ander jaar). `services/superseded.py` bouwt een lazy index vanuit `assets/Superseded lijst.xls` (kolom AJ = canoniek ALT-nummer, kolommen R1–R17 en U1–U9 = verwante nummers). `lookup_superseded(part_number)` geeft alle gerelateerde nummers gesorteerd terug, zonder `-000` suffix. De Inboeken-tab laadt de index alvast in de achtergrond via `preload_async()` bij opstarten. Bij zoeken wordt de korte beschrijving automatisch aangevuld met een `Superseded to: ...` regel; als een artikelnummer niet direct gevonden wordt, zoekt de tab alsnog via superseded nummers in de WC export.
 
 **Website 277 – laatste stap**: Na het genereren van het output-bestand opent de tab automatisch de map (`%LOCALAPPDATA%\Suzuki Parts Manager\output\277\`) in Windows Verkenner via `os.startfile()`, zodat de gebruiker het bestand direct kan uploaden naar de website.
+
+**Website 277 – bestellingformaten**: De engine detecteert automatisch het formaat op basis van kolom B:
+- **CMS-formaat** (kolom B is tekst): `Title | Omschrijving | Aantal | Prijs | Factuurnummer`
+- **Custom-formaat** (kolom B is numeriek): `Title | Aantal | [Prijs] | [Factuurnummer]`
+Alle kolommen vanaf kolom C zijn optioneel; ontbrekende kolommen worden als leeg behandeld. De 1322-tab gebruikt altijd het CMS-formaat (met Omschrijving).
+
+**Factuurwachtrij-checkbox (277 en 1322)**: Beide tabs hebben een checkbox "Toevoegen aan factuurwachtrij / weekfactuur (CMS queue)" (standaard aangevinkt). Als uitgevinkt wordt de order afgeboekt en de picklijst/website-bestand aangemaakt, maar er wordt niets naar `services/cms_queue.py` gestuurd. Bij 277 schakelt dit ook de pattern-blokkering uit. De checkbox reset automatisch naar aangevinkt na "Klaar".
+
+**Factuurmaker – queue timing**: De 277-tab voegt regels pas toe aan de queue ná stap 3 (exporteer), niet direct na afboeken. Zo kan de gebruiker aantallen corrigeren in de tabel na het order picken. De gecorrigeerde geleverde aantallen worden berekend als: `stock_oud - edited_new_stock`. Duplicaatcontrole op factuurnummer vindt plaats vóór toevoeging. De `queue_added`-vlag in `batch_state.json` voorkomt dubbele toevoeging bij herstart.
+
+**Dark mode**: Hardcoded tekstkleuren in tabs (status labels, validatie, banner, context menu) zijn dark-mode-aware via `is_dark_mode(self)` uit `utils/theme.py`. Gebruik altijd `is_dark_mode()` voor inline kleuren — nooit hardcoded donkere kleuren (`#006600`, `#b00020`, `#9a3412` etc.) zonder dark-mode check.
 
 **Krat Beheer – workflow**: Drie-fase proces voor het inventariseren van kratten met onderdelen zonder prijs.
 - Fase 1 (Inventarisatie): medewerker scant artikelnummers, kiest categorieën, noteert voorraad, controleert of artikel al in WC bestaat (nieuw aanmaken vs. samenvoegen). Zedder-tekst kan automatisch categorieën en titel/omschrijving aanvullen.
