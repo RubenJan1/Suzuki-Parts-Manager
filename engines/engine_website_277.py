@@ -1139,6 +1139,11 @@ class Website277Engine:
                 }
             )
 
+            # Zorg dat alle verwachte kolommen bestaan (custom bestellingen missen soms kolom 4)
+            for col, default in [("Title", ""), ("Omschrijving", ""), ("Aantal", 0), ("Prijs", 0.0), ("Factuur", "")]:
+                if col not in df.columns:
+                    df[col] = default
+
             df["Title"] = df["Title"].fillna("").astype(str).str.strip()
             df["Omschrijving"] = df["Omschrijving"].fillna("").astype(str)
             df["Aantal"] = df["Aantal"].apply(to_int)
