@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFileDialog, QMessageBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame, QAbstractItemView, QScrollArea, QApplication,
-    QSizePolicy,
+    QSizePolicy, QCheckBox,
 )
 
 from engines.engine_tlc_1322 import TLC1322Engine
@@ -187,6 +187,10 @@ class TabTLC1322(QWidget):
         self.tbl_order.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.tbl_order.setMinimumHeight(60)
         lay.addWidget(self.tbl_order)
+
+        self.chk_naar_queue_1322 = QCheckBox("Toevoegen aan weekfactuur (CMS queue)")
+        self.chk_naar_queue_1322.setChecked(True)
+        lay.addWidget(self.chk_naar_queue_1322)
 
         btn_verwerken = QPushButton("Afboeken en picklijst openen  →")
         btn_verwerken.setObjectName("primary")
@@ -414,16 +418,21 @@ class TabTLC1322(QWidget):
         # Resultaattabel vullen vanuit last_invoice_lines
         self._vul_result_tabel()
 
-        # Auto-save naar CMS queue
+        # Naar CMS queue sturen (alleen als checkbox aangevinkt)
+        naar_queue = self.chk_naar_queue_1322.isChecked()
         try:
-            from services.cms_queue import add_run
             lines = getattr(self.engine, "last_invoice_lines", [])
-            if lines:
+            if naar_queue and lines:
+                from services.cms_queue import add_run
                 add_run("1322", lines)
                 self.lbl_opgeslagen.setText(
                     f"✅  Verwerkt en opgeslagen voor weekfactuur\n\n"
                     f"{len(lines)} regel(s) opgeslagen voor de CMS factuur.\n"
                     "Ga op donderdag naar de Factuurmaker om de factuur op te maken."
+                )
+            elif lines:
+                self.lbl_opgeslagen.setText(
+                    f"✅  Verwerkt — {len(lines)} artikel(en) NIET naar factuurwachtrij gestuurd."
                 )
             else:
                 self.lbl_opgeslagen.setText(
@@ -434,12 +443,17 @@ class TabTLC1322(QWidget):
 
         self._zet_staat(self.S_VERWERKT)
 
+        factuur_tekst = (
+            "\n\nDe geleverde artikelen zijn opgeslagen voor de weekfactuur.\n"
+            "Ga op donderdag naar de Factuurmaker."
+            if naar_queue else
+            "\n\nLet op: deze bestelling is NIET naar de factuurwachtrij gestuurd."
+        )
         QMessageBox.information(
             self, "1322 klaar",
             "Afboeken is klaar!\n\n"
-            "De picklijst is automatisch geopend.\n\n"
-            "De geleverde artikelen zijn opgeslagen voor de weekfactuur.\n"
-            "Ga op donderdag naar de Factuurmaker."
+            "De picklijst is automatisch geopend."
+            + factuur_tekst
         )
 
     def _vul_result_tabel(self):
@@ -469,6 +483,7 @@ class TabTLC1322(QWidget):
         self.tbl_order.setRowCount(0)
         self.tbl_result.setRowCount(0)
         self.lbl_geladen.setText("Nog geen bestelling geladen.")
+        self.chk_naar_queue_1322.setChecked(True)
         self._zet_staat(self.S_IDLE)
 
     # ─────────────────────────────────────────────────────────

@@ -76,3 +76,12 @@ class BatchStore:
             if b.get("batch_id") == batch_id:
                 return b
         return None
+
+    def update_batch(self, batch_id: str, fields: dict) -> bool:
+        data = self._load()
+        for b in data.get("batches", []):
+            if b.get("batch_id") == batch_id:
+                b.update(fields)
+                self._save(data)
+                return True
+        return False

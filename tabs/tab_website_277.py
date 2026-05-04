@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFileDialog, QMessageBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame, QAbstractItemView, QScrollArea, QApplication,
-    QSizePolicy,
+    QSizePolicy, QCheckBox,
 )
 
 from engines.engine_website_277 import Website277Engine
@@ -47,6 +47,10 @@ class TabWebsite277(QWidget):
         self._state       = self.S_IDLE
         self._result      = None
         self._update_path = None
+
+        # invoice-queue: concept-regels bewaard na afboeken, gecorrigeerd bij export
+        self._invoice_lines_draft: list = []
+        self._orig_new_stock: dict = {}   # {title: int} — originele nieuwe voorraad uit engine
 
         self._build_ui()
         self._restore_openstaande_bestelling()
@@ -263,6 +267,10 @@ class TabWebsite277(QWidget):
         self.tbl_update.setMinimumHeight(60)
         lay.addWidget(self.tbl_update)
 
+        self.chk_naar_queue_277 = QCheckBox("Toevoegen aan factuurwachtrij (CMS queue)")
+        self.chk_naar_queue_277.setChecked(True)
+        lay.addWidget(self.chk_naar_queue_277)
+
         btn_export = QPushButton("Maak bestand klaar voor de website")
         btn_export.setObjectName("primary")
         btn_export.setMinimumHeight(52)
@@ -369,6 +377,10 @@ class TabWebsite277(QWidget):
         self.banner.show()
         self._result      = batch
         self._update_path = batch.get("update_path", "")
+
+        # Herstel concept-factuurregels na herstart (queue_added = False → nog toe te voegen)
+        if not batch.get("queue_added"):
+            self._invoice_lines_draft = list(batch.get("invoice_lines_draft", []))
 
     def _banner_al_gedaan(self):
         for batch in self.store.get_open_batches("277"):
@@ -498,6 +510,14 @@ class TabWebsite277(QWidget):
         self._result      = result
         self._update_path = result.get("update_path", "")
 
+        # Sla de concept-factuurregels op (worden gecorrigeerd bij export)
+        self._invoice_lines_draft = list(getattr(self.engine, "last_invoice_lines", []))
+        self._orig_new_stock = {}  # wordt gevuld door _laad_update_tabel
+
+        # Persisteer draft in batch-state zodat herstart ook werkt
+        result["invoice_lines_draft"] = self._invoice_lines_draft
+        result["queue_added"] = False
+
         self.store.create_batch(result)
 
         pick = result.get("pick_path", "")
@@ -509,15 +529,6 @@ class TabWebsite277(QWidget):
 
         if self._update_path and os.path.exists(self._update_path):
             self._laad_update_tabel(self._update_path)
-
-        # Auto-save naar CMS weekfactuur queue
-        try:
-            from services.cms_queue import add_run
-            lines = getattr(self.engine, "last_invoice_lines", [])
-            if lines:
-                add_run("277", lines)
-        except Exception:
-            pass
 
         self._zet_staat(self.S_AFGEBOEKT)
 
@@ -547,12 +558,20 @@ class TabWebsite277(QWidget):
 
         df = df.sort_values(by=col_title, ascending=True, ignore_index=True)
 
+        # Sla originele (engine) nieuwe-voorraad op per artikel voor correctie-berekening
+        self._orig_new_stock = {}
+
         self.tbl_update.setRowCount(len(df))
         for i, (_, r) in enumerate(df.iterrows()):
             title = str(r.get(col_title, ""))
             stock = str(r.get(col_stock, ""))
             loc   = str(r.get(col_loc, "")) if col_loc else ""
             prijs = str(r.get(col_prijs, "")) if col_prijs else ""
+
+            try:
+                self._orig_new_stock[title] = int(float(stock or "0"))
+            except Exception:
+                pass
 
             item_t = QTableWidgetItem(title)
             item_t.setFlags(item_t.flags() & ~Qt.ItemIsEditable)
@@ -625,6 +644,9 @@ class TabWebsite277(QWidget):
 
             df.to_excel(self._update_path, index=False)
 
+            # Voeg gecorrigeerde regels toe aan factuurqueue (na eventuele tabelwijzigingen)
+            self._voeg_toe_aan_queue()
+
             # Open de map zodat het bestand direct zichtbaar is
             try:
                 os.startfile(str(Path(self._update_path).parent))
@@ -632,11 +654,17 @@ class TabWebsite277(QWidget):
                 pass
 
             naam = Path(self._update_path).name
+            queue_tekst = (
+                "\n\n📋  Regels zijn toegevoegd aan de factuurwachtrij."
+                if self.chk_naar_queue_277.isChecked()
+                else "\n\n⚠️  Niet naar factuurwachtrij gestuurd (checkbox uitgevinkt)."
+            )
             self.lbl_export_klaar.setText(
                 f"✅  Bestand is klaar!\n\n"
                 f"Ga nu naar WP All Import en importeer dit bestand:\n\n"
                 f"📄  {naam}\n\n"
                 f"Locatie:\n{self._update_path}"
+                + queue_tekst
             )
             self.lbl_export_klaar.show()
             self._zet_staat(self.S_WACHT_IMPORT)
@@ -655,10 +683,104 @@ class TabWebsite277(QWidget):
             "Je kunt nu een nieuwe bestelling laden."
         )
 
+    def _voeg_toe_aan_queue(self):
+        """
+        Berekent gecorrigeerde leveraantallen (op basis van tabelwijzigingen) en
+        voegt ze toe aan de CMS-factuurqueue. Controleert eerst op duplicaten.
+        Wordt aangeroepen vanuit _exporteer_update(), niet vanuit _afboeken().
+        """
+        if not self.chk_naar_queue_277.isChecked():
+            return
+
+        if not self._invoice_lines_draft:
+            return
+
+        # Controleer of queue al is bijgewerkt voor deze batch (bijv. bij dubbele klik)
+        batch_id = (self._result or {}).get("batch_id")
+        if batch_id:
+            batch = self.store.get_batch(batch_id)
+            if batch and batch.get("queue_added"):
+                return
+
+        # Lees de door-gebruiker-aangepaste nieuwe voorraad uit de tabel
+        title_to_edited_stock: dict = {}
+        for row in range(self.tbl_update.rowCount()):
+            t_item = self.tbl_update.item(row, 0)
+            s_item = self.tbl_update.item(row, 1)
+            if t_item and s_item:
+                try:
+                    title_to_edited_stock[t_item.text()] = int(float(s_item.text() or "0"))
+                except Exception:
+                    pass
+
+        # Bereken gecorrigeerde geleverde aantallen per artikel
+        corrected_lines = []
+        for line in self._invoice_lines_draft:
+            title      = line["title"]
+            orig_ns    = self._orig_new_stock.get(title)      # originele nieuwe voorraad (engine)
+            edited_ns  = title_to_edited_stock.get(title)     # door gebruiker aangepaste nieuwe voorraad
+
+            if orig_ns is not None and edited_ns is not None and orig_ns != edited_ns:
+                # stock_oud = geleverd_orig + orig_ns
+                # geleverd_corrected = stock_oud - edited_ns
+                stock_oud = line["geleverd"] + orig_ns
+                geleverd  = max(0, stock_oud - edited_ns)
+            else:
+                geleverd = line["geleverd"]
+
+            if geleverd > 0:
+                corrected_lines.append({**line, "geleverd": geleverd})
+
+        if not corrected_lines:
+            return
+
+        # Duplicaat-check: zijn deze factuurnummers al in de queue?
+        try:
+            from services.cms_queue import pending_factuurnummers
+            bestaand   = set(pending_factuurnummers("277"))
+            nieuwe_fnr = {
+                l["factuurnummer"].strip()
+                for l in corrected_lines
+                if str(l.get("factuurnummer", "")).strip()
+            }
+            dubbel = bestaand & nieuwe_fnr
+
+            if dubbel:
+                antw = QMessageBox.question(
+                    self,
+                    "Mogelijke dubbele bestelling",
+                    f"Order(s) {', '.join(sorted(dubbel))} staan AL in de factuurqueue.\n\n"
+                    "Heb je deze bestelling al eerder verwerkt?\n\n"
+                    "Klik 'Ja' om ze toch toe te voegen (bewust dubbel).\n"
+                    "Klik 'Nee' om NIET toe te voegen (aanbevolen).",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if antw != QMessageBox.Yes:
+                    return
+        except Exception:
+            pass
+
+        # Voeg toe aan queue
+        try:
+            from services.cms_queue import add_run
+            add_run("277", corrected_lines)
+        except Exception:
+            return
+
+        # Markeer batch als queue_added zodat herstart niet dubbel toevoegt
+        if batch_id:
+            try:
+                self.store.update_batch(batch_id, {"queue_added": True})
+            except Exception:
+                pass
+
     def _reset(self):
         self.engine.clear()
         self._result      = None
         self._update_path = None
+        self._invoice_lines_draft = []
+        self._orig_new_stock      = {}
 
         self.tbl_order.setRowCount(0)
         self.tbl_update.setRowCount(0)
@@ -666,6 +788,7 @@ class TabWebsite277(QWidget):
         self.btn_volgende1.setEnabled(False)
         self.lbl_export_klaar.hide()
         self.banner.hide()
+        self.chk_naar_queue_277.setChecked(True)
 
         self._zet_staat(self.S_IDLE)
 

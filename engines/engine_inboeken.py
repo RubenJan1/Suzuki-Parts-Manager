@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import date
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List, Tuple
-from utils.paths import output_root
+from utils.paths import output_root, resource_path
 
 import os
 import re
@@ -2127,14 +2127,13 @@ class InboekenEngine:
 
     def _load_reiners_if_present(self) -> None:
         candidates = [
+            str(resource_path("assets/reiners.xlsx")),
+            str(resource_path("assets/reiners.csv")),
             os.path.join(os.getcwd(), "reiners.xlsx"),
             os.path.join(os.getcwd(), "reiners.csv"),
-            os.path.join(os.getcwd(), "GT Lijst xls.xls"),
             os.path.join(os.getcwd(), "assets", "reiners.xlsx"),
             os.path.join(os.getcwd(), "assets", "reiners.csv"),
-            os.path.join(os.getcwd(), "assets", "GT Lijst xls.xls"),
         ]
-
 
         p = next((c for c in candidates if os.path.exists(c)), None)
         if not p:
@@ -2144,7 +2143,6 @@ class InboekenEngine:
             if p.lower().endswith(".csv"):
                 self.reiners_df = pd.read_csv(p, dtype=str, low_memory=False)
             else:
-                # .xlsx werkt met openpyxl; .xls kan xlrd nodig hebben
                 self.reiners_df = pd.read_excel(p, dtype=str)
             self.reiners_df.columns = [str(c).strip() for c in self.reiners_df.columns]
         except Exception:

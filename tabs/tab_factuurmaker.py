@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from engines.engine_factuurmaker import FactuurMakerEngine
 from utils.paths import output_root, resource_path
-from utils.theme import apply_theme
+from utils.theme import apply_theme, is_dark_mode
 from PySide6.QtGui import QColor
 
 def currency(value) -> str:
@@ -81,8 +81,9 @@ class TabFactuurmaker(QWidget):
 
         self.banner_lbl = QLabel()
         self.banner_lbl.setWordWrap(True)
+        _banner_kleur = "#fb923c" if is_dark_mode(self) else "#9a3412"
         self.banner_lbl.setStyleSheet(
-            "font-size: 13px; font-weight: bold; color: #9a3412;"
+            f"font-size: 13px; font-weight: bold; color: {_banner_kleur};"
             "background: transparent; border: none;"
         )
         lay.addWidget(self.banner_lbl)
@@ -145,6 +146,30 @@ class TabFactuurmaker(QWidget):
             entries = get_pending(bron)
             if not entries:
                 return
+
+            # Controleer op dubbele factuurnummers over entries heen (menselijke fout)
+            from collections import Counter
+            fnr_teller: Counter = Counter()
+            for entry in entries:
+                for r in entry.get("regels", []):
+                    fn = str(r.get("factuurnummer", "")).strip()
+                    if fn:
+                        fnr_teller[fn] += 1
+            dubbel_fnr = [fn for fn, n in fnr_teller.items() if n > 1]
+            if dubbel_fnr:
+                antw = QMessageBox.question(
+                    self,
+                    "Waarschuwing — Dubbele orders in queue",
+                    f"De volgende order(s) komen MEERDERE KEREN voor in de queue:\n\n"
+                    f"{', '.join(sorted(dubbel_fnr))}\n\n"
+                    "Dit kan komen door een dubbele afboekrun.\n\n"
+                    "Controleer de regels na het laden en verwijder de dubbelen!\n\n"
+                    "Klik OK om toch te laden.",
+                    QMessageBox.Ok | QMessageBox.Cancel,
+                    QMessageBox.Cancel,
+                )
+                if antw != QMessageBox.Ok:
+                    return
 
             regels = []
             for entry in entries:
@@ -641,32 +666,35 @@ class TabFactuurmaker(QWidget):
             warning_text = "\n⚠️ Waarschuwingen:\n- " + "\n- ".join(preview_warnings[:2])
 
         # ===== Resultaat (één keer instellen)
+        _dark = is_dark_mode(self)
         if errors:
             self.lbl_validation.setText(
                 "❌ Niet klaar:\n- " + "\n- ".join(errors) + warning_text
             )
-            self.lbl_validation.setStyleSheet("""
-                QLabel {
+            _err_kleur = "#fca5a5" if _dark else "#a00000"
+            self.lbl_validation.setStyleSheet(f"""
+                QLabel {{
                     background: rgba(255, 0, 0, 0.08);
                     border: 1px solid rgba(255, 0, 0, 0.4);
                     border-radius: 8px;
                     padding: 10px;
                     font-weight: bold;
-                    color: #a00000;
-                }
+                    color: {_err_kleur};
+                }}
             """)
             self.btn_generate.setEnabled(False)
         else:
             self.lbl_validation.setText("✅ Klaar om te genereren" + warning_text)
-            self.lbl_validation.setStyleSheet("""
-                QLabel {
+            _ok_kleur = "#86efac" if _dark else "#006600"
+            self.lbl_validation.setStyleSheet(f"""
+                QLabel {{
                     background: rgba(0, 150, 0, 0.08);
                     border: 1px solid rgba(0, 150, 0, 0.4);
                     border-radius: 8px;
                     padding: 10px;
                     font-weight: bold;
-                    color: #006600;
-                }
+                    color: {_ok_kleur};
+                }}
             """)
             self.btn_generate.setEnabled(True)
 

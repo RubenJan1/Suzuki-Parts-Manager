@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QMessageBox, QFrame
 )
-from utils.theme import apply_theme
+from utils.theme import apply_theme, is_dark_mode
 from version import APP_VERSION, GITHUB_OWNER, GITHUB_REPO
 from services.update_checker import check_github_release
 from services.auto_updater import run_updater
@@ -179,15 +179,16 @@ class TabIntro(QWidget):
         self.export_warning = QLabel("")
         self.export_warning.setWordWrap(True)
         self.export_warning.hide()
-        self.export_warning.setStyleSheet("""
-            QLabel {
+        _amber = "#fcd34d" if is_dark_mode(self) else "#b06a00"
+        self.export_warning.setStyleSheet(f"""
+            QLabel {{
                 background: rgba(255, 170, 0, 0.14);
                 border: 1px solid rgba(255, 170, 0, 0.35);
                 border-radius: 8px;
                 padding: 10px;
-                color: #b06a00;
+                color: {_amber};
                 font-weight: bold;
-            }
+            }}
         """)
         root.addWidget(self.export_warning)
 

@@ -33,9 +33,27 @@ from PySide6.QtWidgets import (
 )
 
 from engines.engine_inboeken import InboekenEngine, SearchHit, CATEGORIES_TREE, parse_price, round_up_to_5cent
-from utils.theme import apply_theme
+from utils.theme import apply_theme, is_dark_mode
 
 SEARCH_LIMIT = 500
+
+
+def _try_format_part_number(q: str) -> str:
+    """
+    Formatteer een getal zonder streepjes naar Suzuki-formaat.
+    Alleen als de invoer puur cijfers is (geen letters = geen Honda/Yamaha).
+    10 cijfers → XXXXX-XXXXX
+    13 cijfers → XXXXX-XXXXX-XXX
+    Anders → ongewijzigd terug.
+    """
+    stripped = q.replace("-", "").replace(" ", "")
+    if not stripped.isdigit():
+        return q
+    if len(stripped) == 10:
+        return f"{stripped[:5]}-{stripped[5:]}"
+    if len(stripped) == 13:
+        return f"{stripped[:5]}-{stripped[5:10]}-{stripped[10:]}"
+    return q
 
 
 class ChooseHitDialog(QDialog):
@@ -203,28 +221,52 @@ class TabInboeken(QWidget):
         menu = widget.createStandardContextMenu()
         menu.setAttribute(Qt.WA_TranslucentBackground, False)
         menu.setWindowOpacity(1.0)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #f4f4f4;
-                border: 1px solid #8a8a8a;
-                padding: 4px;
-                color: #111111;
-            }
-            QMenu::item {
-                background-color: transparent;
-                padding: 6px 24px 6px 24px;
-                margin: 1px;
-            }
-            QMenu::item:selected {
-                background-color: #d9d9d9;
-                color: #111111;
-            }
-            QMenu::separator {
-                height: 1px;
-                background: #bdbdbd;
-                margin: 4px 8px;
-            }
-        """)
+        if is_dark_mode(self):
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #1F2937;
+                    border: 1px solid #334155;
+                    padding: 4px;
+                    color: #E5E7EB;
+                }
+                QMenu::item {
+                    background-color: transparent;
+                    padding: 6px 24px 6px 24px;
+                    margin: 1px;
+                }
+                QMenu::item:selected {
+                    background-color: #334155;
+                    color: #FFFFFF;
+                }
+                QMenu::separator {
+                    height: 1px;
+                    background: #475569;
+                    margin: 4px 8px;
+                }
+            """)
+        else:
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #f4f4f4;
+                    border: 1px solid #8a8a8a;
+                    padding: 4px;
+                    color: #111111;
+                }
+                QMenu::item {
+                    background-color: transparent;
+                    padding: 6px 24px 6px 24px;
+                    margin: 1px;
+                }
+                QMenu::item:selected {
+                    background-color: #d9d9d9;
+                    color: #111111;
+                }
+                QMenu::separator {
+                    height: 1px;
+                    background: #bdbdbd;
+                    margin: 4px 8px;
+                }
+            """)
         menu.exec(widget.mapToGlobal(pos))
 
     def _install_solid_context_menus(self):
@@ -814,14 +856,15 @@ class TabInboeken(QWidget):
         # -----------------------------
         ok = len(problems) == 0
 
+        dark = is_dark_mode(self)
         if ok:
             self.lbl_status.setText("✅ Klaar om op te slaan")
-            self.lbl_status.setStyleSheet("color: #1b7f3a;")
+            self.lbl_status.setStyleSheet("color: #86efac;" if dark else "color: #1b7f3a;")
         else:
             self.lbl_status.setText(
                 "⚠️ Mist nog: " + " • ".join(problems[:3]) + (" …" if len(problems) > 3 else "")
             )
-            self.lbl_status.setStyleSheet("color: #b00020;")
+            self.lbl_status.setStyleSheet("color: #fca5a5;" if dark else "color: #b00020;")
 
         self.btn_save.setEnabled(ok)
 
@@ -854,8 +897,17 @@ class TabInboeken(QWidget):
                 if chosen:
                     self._apply_hit(chosen)
                 return
+
+            # Niets gevonden: probeer bare-digits te formatteren als Suzuki-nummer
+            formatted = _try_format_part_number(q)
+            if formatted != q:
+                self.ed_title.setText(formatted)
+                self._log(f"OPGEMAAKT | {q} → {formatted}")
+                self._fill_superseded()
+
             QMessageBox.information(self, "Zoek", f"Niets gevonden voor: {q}")
-            self._fill_superseded()
+            if formatted == q:
+                self._fill_superseded()
             return
 
         chosen = self._choose_from_hits(hits, title=f"Zoekresultaten ({len(hits)})")
