@@ -9,8 +9,23 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+            zip_name: Suzuki.Parts.Manager.Windows.zip
+            pyinstaller_cmd: >-
+              pyinstaller --name "Suzuki Parts Manager" --windowed --icon="assets/app_icon.ico" --add-data "assets;assets" --onedir main.py
+          - os: macos-latest
+            target: macos
+            zip_name: Suzuki.Parts.Manager.macOS.zip
+            pyinstaller_cmd: >-
+              pyinstaller --name "Suzuki Parts Manager" --windowed --add-data "assets:assets" --onedir main.py
 
     steps:
       - name: Checkout
@@ -24,70 +39,75 @@ jobs:
 
       - name: Versienummer uitlezen
         id: version
-        shell: pwsh
+        shell: bash
         run: |
-          $ver = python -c "exec(open('version.py').read()); print(APP_VERSION)"
-          echo "version=$ver" >> $env:GITHUB_OUTPUT
-          echo "tag=v$ver" >> $env:GITHUB_OUTPUT
-
-      - name: Controleer of release al bestaat
-        id: check
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $ErrorActionPreference = 'Continue'
-          gh release view ${{ steps.version.outputs.tag }} 2>$null | Out-Null
-          if ($LASTEXITCODE -eq 0) {
-            "exists=true" >> $env:GITHUB_OUTPUT
-            Write-Host "Release ${{ steps.version.outputs.tag }} bestaat al — overgeslagen."
-          } else {
-            "exists=false" >> $env:GITHUB_OUTPUT
-            Write-Host "Nieuwe release: ${{ steps.version.outputs.tag }}"
-          }
-          exit 0
+          ver=$(python -c "exec(open('version.py').read()); print(APP_VERSION)")
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "tag=v$ver" >> "$GITHUB_OUTPUT"
 
       - name: Dependencies installeren
-        if: steps.check.outputs.exists == 'false'
         run: pip install -r requirements.txt pyinstaller
 
-      - name: Updater bouwen (updater.exe)
-        if: steps.check.outputs.exists == 'false'
+      - name: Updater bouwen (Windows)
+        if: matrix.target == 'windows'
         run: pyinstaller --onefile --name updater --console updater.py
 
       - name: Hoofdapp bouwen
-        if: steps.check.outputs.exists == 'false'
-        shell: pwsh
-        run: |
-          pyinstaller `
-            --name "Suzuki Parts Manager" `
-            --windowed `
-            --icon="assets/app_icon.ico" `
-            --add-data "assets;assets" `
-            --onedir `
-            main.py
+        shell: bash
+        run: ${{ matrix.pyinstaller_cmd }}
 
-      - name: updater.exe kopiëren naar app-map
-        if: steps.check.outputs.exists == 'false'
+      - name: updater toevoegen aan Windows build
+        if: matrix.target == 'windows'
         shell: pwsh
         run: Copy-Item "dist\updater.exe" "dist\Suzuki Parts Manager\updater.exe"
 
-      - name: Zip aanmaken
-        if: steps.check.outputs.exists == 'false'
+      - name: Zip aanmaken (Windows)
+        if: matrix.target == 'windows'
         shell: pwsh
-        run: |
-          Compress-Archive `
-            -Path "dist\Suzuki Parts Manager" `
-            -DestinationPath "Suzuki.Parts.Manager.zip"
+        run: Compress-Archive -Path "dist\Suzuki Parts Manager" -DestinationPath "${{ matrix.zip_name }}"
 
-      - name: GitHub Release aanmaken en zip uploaden
-        if: steps.check.outputs.exists == 'false'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Zip aanmaken (macOS)
+        if: matrix.target == 'macos'
+        shell: bash
+        run: ditto -c -k --sequesterRsrc --keepParent "dist/Suzuki Parts Manager.app" "${{ matrix.zip_name }}"
+
+      - name: Artifact uploaden
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}-build
+          path: ${{ matrix.zip_name }}
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Versienummer uitlezen
+        id: version
+        shell: bash
         run: |
-          gh release create ${{ steps.version.outputs.tag }} `
-            --title "Suzuki Parts Manager ${{ steps.version.outputs.tag }}" `
-            --notes "Automatische release van versie ${{ steps.version.outputs.tag }}." `
-            --latest `
-            "Suzuki.Parts.Manager.zip"
+          ver=$(python -c "exec(open('version.py').read()); print(APP_VERSION)")
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "tag=v$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Build artifacts downloaden
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: GitHub Release publiceren / updaten
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Suzuki Parts Manager ${{ steps.version.outputs.tag }}
+          body: Automatische release van versie ${{ steps.version.outputs.tag }}.
+          make_latest: true
+          files: |
+            release-assets/windows-build/Suzuki.Parts.Manager.Windows.zip
+            release-assets/macos-build/Suzuki.Parts.Manager.macOS.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
