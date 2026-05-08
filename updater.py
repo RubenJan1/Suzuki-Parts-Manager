@@ -146,7 +146,7 @@ def main():
         exe_path = os.path.join(app_dir, "Suzuki Parts Manager.exe")
         os.startfile(exe_path)
     else:
-        app_path = app_dir if app_dir.endswith('.app') else os.path.join(app_dir, "Suzuki Parts Manager.app")
+        app_path = os.path.join(app_dir, "Suzuki Parts Manager.app")
         if os.path.exists(app_path):
             subprocess.Popen(["open", app_path])
         else:

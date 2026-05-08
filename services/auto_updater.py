@@ -4,7 +4,7 @@ import subprocess
 import sys
 import zipfile
 import platform
-from pathlib import Path
+import webbrowser
 
 
 def download_file(url, dest):
@@ -12,17 +12,8 @@ def download_file(url, dest):
 
 
 def run_updater(download_url):
+    app_dir = os.path.dirname(sys.executable)
     is_windows = platform.system() == "Windows"
-
-    if is_windows:
-        app_dir = os.path.dirname(sys.executable)
-    else:
-        exe_path = Path(sys.executable).resolve()
-        if ".app" in exe_path.parts:
-            app_index = exe_path.parts.index(next(p for p in exe_path.parts if p.endswith(".app")))
-            app_dir = str(Path(*exe_path.parts[:app_index + 1]))
-        else:
-            app_dir = str(exe_path.parent)
 
     if is_windows:
         local_app_data = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
@@ -59,13 +50,6 @@ def run_updater(download_url):
             str(os.getpid()),
         ])
     else:
-        updater_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), "updater.py")
-        subprocess.Popen([
-            sys.executable,
-            updater_script,
-            zip_path,
-            app_dir,
-            str(os.getpid()),
-        ])
+        webbrowser.open(download_url)
 
     sys.exit(0)
