@@ -1,4 +1,4 @@
 APP_NAME = "Suzuki Parts Manager"
-APP_VERSION = "2.2.2"
+APP_VERSION = "2.2.3"
 GITHUB_OWNER = "RubenJan1"
 GITHUB_REPO = "Suzuki-Parts-Manager"
