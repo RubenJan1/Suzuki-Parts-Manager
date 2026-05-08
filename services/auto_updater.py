@@ -4,6 +4,7 @@ import subprocess
 import sys
 import zipfile
 import platform
+import webbrowser
 
 
 def download_file(url, dest):
@@ -49,13 +50,6 @@ def run_updater(download_url):
             str(os.getpid()),
         ])
     else:
-        updater_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), "updater.py")
-        subprocess.Popen([
-            sys.executable,
-            updater_script,
-            zip_path,
-            app_dir,
-            str(os.getpid()),
-        ])
+        webbrowser.open(download_url)
 
     sys.exit(0)
