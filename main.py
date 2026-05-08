@@ -124,6 +124,10 @@ class MainWindow(QMainWindow):
         self.resize(1100, 750)
 
         self.tabs = QTabWidget()
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.setElideMode(Qt.ElideNone)
+        self.tabs.setDocumentMode(False)
+        self.tabs.setMovable(False)
         self.setCentralWidget(self.tabs)
 
         apply_theme(self)
@@ -131,11 +135,13 @@ class MainWindow(QMainWindow):
         # ✅ JUISTE Intro tab
         self.intro_tab = TabIntro(self.app_state, self.create_work_tabs)
         self.tabs.addTab(self.intro_tab, "Start")
+        self.tabs.setCurrentWidget(self.intro_tab)
 
 
     def create_work_tabs(self):
         self.tabs.clear()
         self.tabs.addTab(self.intro_tab, "Start")
+        self.tabs.setCurrentWidget(self.intro_tab)
 
         self.tab_inboeken = TabInboeken(self.app_state)
         self.tab_tradelist = TabTradelist(self.app_state)
