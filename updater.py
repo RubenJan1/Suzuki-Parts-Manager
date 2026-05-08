@@ -4,6 +4,8 @@ import stat
 import time
 import shutil
 import zipfile
+import subprocess
+import platform
 
 
 def log(msg):
@@ -75,13 +77,21 @@ def replace_files(src, dst):
 
 def wait_for_app_to_close(pid: int):
     log(f"Wachten tot app sluit (PID {pid})...")
-    import ctypes
-    kernel32 = ctypes.windll.kernel32
-    SYNCHRONIZE = 0x00100000
-    handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
-    if handle:
-        kernel32.WaitForSingleObject(handle, 30000)  # max 30 sec
-        kernel32.CloseHandle(handle)
+    if platform.system() == "Windows":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        SYNCHRONIZE = 0x00100000
+        handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+        if handle:
+            kernel32.WaitForSingleObject(handle, 30000)  # max 30 sec
+            kernel32.CloseHandle(handle)
+    else:
+        for _ in range(30):
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                break
+            time.sleep(1)
     time.sleep(1)
 
 
@@ -131,9 +141,18 @@ def main():
     except Exception:
         pass
 
-    exe_path = os.path.join(app_dir, "Suzuki Parts Manager.exe")
     log("Nieuwe versie starten...")
-    os.startfile(exe_path)
+    if platform.system() == "Windows":
+        exe_path = os.path.join(app_dir, "Suzuki Parts Manager.exe")
+        os.startfile(exe_path)
+    else:
+        app_path = os.path.join(app_dir, "Suzuki Parts Manager.app")
+        if os.path.exists(app_path):
+            subprocess.Popen(["open", app_path])
+        else:
+            main_py = os.path.join(app_dir, "main.py")
+            if os.path.exists(main_py):
+                subprocess.Popen([sys.executable, main_py], cwd=app_dir)
 
 
 if __name__ == "__main__":
