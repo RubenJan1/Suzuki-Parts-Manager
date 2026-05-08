@@ -8,7 +8,9 @@ import webbrowser
 
 
 def download_file(url, dest):
-    urllib.request.urlretrieve(url, dest)
+    context = ssl.create_default_context(cafile=certifi.where())
+    with urllib.request.urlopen(url, context=context) as resp, open(dest, "wb") as out:
+        out.write(resp.read())
 
 
 def run_updater(download_url):
