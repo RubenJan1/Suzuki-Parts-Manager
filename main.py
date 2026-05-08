@@ -1,5 +1,6 @@
 import sys
 import ctypes
+import platform
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget,
@@ -156,9 +157,10 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-        "classic.suzuki.parts.manager"
-    )
+    if platform.system() == "Windows":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "classic.suzuki.parts.manager"
+        )
 
     app = QApplication(sys.argv)
 
