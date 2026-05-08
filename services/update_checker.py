@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import urllib.request
 import urllib.error
+import ssl
 from dataclasses import dataclass
 from typing import Optional
+
+import certifi
 
 
 @dataclass
@@ -66,7 +69,8 @@ def _fetch_json(url: str, timeout: int) -> dict | list | None:
             "User-Agent": "Suzuki-Parts-Manager",
         },
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    context = ssl.create_default_context(cafile=certifi.where())
+    with urllib.request.urlopen(req, timeout=timeout, context=context) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
